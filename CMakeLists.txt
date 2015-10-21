@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.6)
 project(parConnect)
 
 ##### General Compilation Settings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wuninitialized --std=c++11  -Drestrict=__restrict__  -ffast-math -DGRAPH_GENERATOR_MPI -DGRAPHGEN_DISTRIBUTED_MEMORY")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11  -Drestrict=__restrict__  -ffast-math -DGRAPH_GENERATOR_MPI -DGRAPHGEN_DISTRIBUTED_MEMORY")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -msse3 -march=native -funroll-loops")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} -g")
@@ -34,8 +34,15 @@ endif (MPI_FOUND)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib CACHE PATH "Output directory for libraries" )
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH "Output directory for applications" )
 
+# include external repo : mxx
+include_directories("${PROJECT_SOURCE_DIR}/ext/mxx/include")
+
 # include src files
 include_directories("${PROJECT_SOURCE_DIR}/src")
+
+# add gtest
+include_directories("${PROJECT_SOURCE_DIR}/gtest")
+add_subdirectory("${PROJECT_SOURCE_DIR}/gtest")
 
 # add own subdirectories
 add_subdirectory("${PROJECT_SOURCE_DIR}/test")

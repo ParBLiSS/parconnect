@@ -1,5 +1,5 @@
 /**
- * @file    graph500Gen.cpp
+ * @file    graph500Gen.hpp
  * @ingroup group
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Wrapper around code files for graph500 graph generator.
@@ -7,6 +7,8 @@
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
 
+#ifndef GRAPH500_GEN_HPP
+#define GRAPH500_GEN_HPP
 
 //Includes
 #include <mpi.h>
@@ -15,6 +17,7 @@
 
 //Own includes
 #include "graphGen/graph500/include/make_graph.h"
+#include "mxx/timer.hpp"
 
 namespace conn 
 {
@@ -48,7 +51,8 @@ namespace conn
         void populateEdgeList( std::vector< std::pair<int64_t, int64_t> > &edgeList, 
             uint8_t scale, 
             uint8_t edgeFactor, 
-            uint8_t mode)
+            uint8_t mode,
+            mxx::comm comm = mxx::comm())
         {
           //seeds to use
           int64_t seeds[2] = {1,2};
@@ -58,6 +62,8 @@ namespace conn
           int64_t nedges;
 
           T *edges;
+
+          mxx::section_timer timer;
 
           //Use the internal function to populate the edges
           make_graph(scale, desired_nedges, seeds[0], seeds[1], initiator, &nedges, &edges);
@@ -84,6 +90,7 @@ namespace conn
           //Free temporary memory
           free(edges);
 
+          timer.end_section("graph generation completed");
         }
 
     };
@@ -91,3 +98,5 @@ namespace conn
     const double graph500Gen::initiator[4] =  {.57, .19, .19, .05};
   }
 }
+
+#endif

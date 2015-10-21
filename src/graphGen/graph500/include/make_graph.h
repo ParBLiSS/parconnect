@@ -49,18 +49,18 @@ void make_graph(int log_numverts, int64_t desired_nedges, uint64_t userseed1, ui
   int64_t* local_edges = (int64_t*)xmalloc(2 * nedges * sizeof(int64_t));
 #endif
 
-  double start = MPI_Wtime();
+  //double start = MPI_Wtime();
   generate_kronecker(rank, size, seed, log_numverts, M, initiator, local_edges);
-  double gen_time = MPI_Wtime() - start;
+  //double gen_time = MPI_Wtime() - start;
 
   int64_t* local_vertex_perm = NULL;
 
   mrg_state state;
   mrg_seed(&state, seed);
-  start = MPI_Wtime();
+  //start = MPI_Wtime();
   int64_t perm_local_size;
   rand_sort_mpi(MPI_COMM_WORLD, &state, N, &perm_local_size, &local_vertex_perm);
-  double perm_gen_time = MPI_Wtime() - start;
+  //double perm_gen_time = MPI_Wtime() - start;
 
   /* Copy the edge endpoints into the result array if necessary. */
   int64_t* result;
@@ -82,30 +82,30 @@ void make_graph(int log_numverts, int64_t desired_nedges, uint64_t userseed1, ui
 #endif
 
   /* Apply vertex permutation to graph. */
-  start = MPI_Wtime();
+  //start = MPI_Wtime();
   apply_permutation_mpi(MPI_COMM_WORLD, perm_local_size, local_vertex_perm, N, nedges, result);
-  double perm_apply_time = MPI_Wtime() - start;
+  //double perm_apply_time = MPI_Wtime() - start;
 
   free(local_vertex_perm); local_vertex_perm = NULL;
 
   /* Randomly mix up the order of the edges. */
-  start = MPI_Wtime();
+  //start = MPI_Wtime();
   int64_t* new_result;
   int64_t nedges_out;
   scramble_edges_mpi(MPI_COMM_WORLD, userseed1, userseed2, nedges, result, &nedges_out, &new_result);
-  double edge_scramble_time = MPI_Wtime() - start;
+  //double edge_scramble_time = MPI_Wtime() - start;
 
   free(result); result = NULL;
 
   *result_ptr = new_result;
   *nedges_ptr = nedges_out;
 
-  if (rank == 0) {
-    fprintf(stdout, "unpermuted_graph_generation:    %f s\n", gen_time);
-    fprintf(stdout, "vertex_permutation_generation:  %f s\n", perm_gen_time);
-    fprintf(stdout, "vertex_permutation_application: %f s\n", perm_apply_time);
-    fprintf(stdout, "edge_scrambling:                %f s\n", edge_scramble_time);
-  }
+  /*if (rank == 0) {*/
+    //fprintf(stdout, "unpermuted_graph_generation:    %f s\n", gen_time);
+    //fprintf(stdout, "vertex_permutation_generation:  %f s\n", perm_gen_time);
+    //fprintf(stdout, "vertex_permutation_application: %f s\n", perm_apply_time);
+    //fprintf(stdout, "edge_scrambling:                %f s\n", edge_scramble_time);
+  /*}*/
 }
 
 /* PRNG interface for implementations; takes seed in same format as given by
