@@ -2,7 +2,7 @@
  * @file    labelProp.hpp
  * @ingroup group
  * @author  Chirag Jain <cjain7@gatech.edu>
- * @brief   Custom tuple comparators
+ * @brief   Connected component labeling using label propagation (or coloring) approach
  *
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
@@ -15,6 +15,7 @@
 
 //Own includes
 #include "coloring/tupleComp.hpp"
+#include "coloring/labelProp_utils.hpp"
 #include "utils/commonfuncs.hpp"
 #include "utils/logging.hpp"
 #include "utils/prettyprint.hpp"
@@ -30,29 +31,13 @@ namespace conn
   {
 
     /**
-     * @brief     enum to declare tuple format used during coloring
+     * @class                     conn::coloring::ccl
+     * @brief                     supports parallel connected component labeling using label propagation technique
+     * @tparam[in]  pIdtype       type used for partition ids
+     * @tparam[in]  nIdType       type used for node id
+     * @tparam[in]  OPTIMIZATION  optimization level for benchmarking, use loadbalanced for the best version 
      */
-    enum cclTupleIds
-    {
-      Pc,         //Pc layer, current partition id
-      Pn,         //Pn layer, candidate parition ids
-      nId      //Node id , remains unchanged
-    };
-
-    /**
-     * @brief     pair format of each edge in the edgeList
-     */
-    enum edgeListTIds
-    {
-      src,        //source vertex id for edge
-      dst         //destination vertex id for edge
-    };
-
-    /**
-     * @class     conn::coloring::ccl
-     * @brief     supports parallel connected component labeling using label propagation technique
-     */
-    template<typename pIdtype = uint32_t, typename nIdType = uint64_t>
+    template<typename pIdtype = uint32_t, typename nIdType = uint64_t, uint8_t OPTIMIZATION = opt_level::loadbalanced>
     class ccl 
     {
       public:
@@ -67,7 +52,13 @@ namespace conn
         using T = std::tuple<pIdtype, pIdtype, nodeIdType>;
         std::vector<T> tupleVector;
 
+        //Used during initialization of <Pn>
+        //Also used to mark partitions as stable
         pIdtype MAX = std::numeric_limits<pIdtype>::max();
+
+        //Used to mark tuples as stable 
+        //partitions would become stable if all its tuples are stable
+        pIdtype MAX2 = std::numeric_limits<pIdtype>::max() -1 ;
 
       public:
         //Constructor
@@ -99,7 +90,8 @@ namespace conn
         std::size_t getComponentCount()
         {
           //Vector should be sorted by Pc
-          assert(is_sorted(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>()));
+          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>()))
+            mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>());
 
           //Count unique Pc values
           return mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  TpleComp<cclTupleIds::Pc>());
@@ -161,53 +153,108 @@ namespace conn
 
           mxx::section_timer timer;
 
+          auto begin = tupleVector.begin();
+          auto end = tupleVector.end();
+          auto mid = begin;   //range mid-end represents active partitions
+
           while(!converged)
           {
-            updatePn();
-            converged = updatePc();
+            updatePn( mid , end );
+
+            converged = updatePc( mid , end );
+
+            //parition the dataset into stable and active paritions, if optimization is enabled
+            if(!converged && (OPTIMIZATION == opt_level::stable_partition_removed || OPTIMIZATION == opt_level::loadbalanced))
+            {
+              //use std::partition to move stable tuples to the left
+              //After this step, mid-end would represent active tuples
+              mid = partitionStableTuples( mid, end );
+
+              if(OPTIMIZATION == opt_level::loadbalanced)
+                mid = mxx::block_decompose_partitions(begin, mid, end, comm);
+                //Re distributed the tuples to balance the load across the ranks
+            }
+
+
             iterCount ++;
           }
 
           timer.end_section("Coloring done");
+          //std::cout << tupleVector << "\n";
 
           LOG_IF(comm.rank() == 0, INFO) << "Iteration count " << iterCount;
         }
 
         /**
-         * @brief     update the Pn layer by sorting the tuples using node ids
+         * @brief             update the Pn layer by sorting the tuples using node ids
+         * @param[in] begin   To iterate over the vector of tuples, marks the range of active tuples 
+         * @param[in] end     end iterator
          */
-        void updatePn(mxx::comm comm = mxx::comm())
+        template <typename Iterator>
+        void updatePn(Iterator begin, Iterator end, mxx::comm comm = mxx::comm())
         {
-          //Sort by nid
-          mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::nId>(), comm); 
+          //Sort by nid,Pc
+          mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::nId, cclTupleIds::Pc>(), comm); 
 
-          //We need to run a exscan over first element of last bucket to resolve boundary splits
-          //Find the element with max node id and min Pc locally 
-          auto firstElementOfLastBucket = mxx::local_reduce(tupleVector.begin(), tupleVector.end(), TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>());
+          //Resolve last and first bucket's boundary splits
+          
+          //First, find the element with max node id and min Pc locally 
+          //Or in other words, get the min Pc of the last bucket
+          auto minPcOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>());
 
-          //Result of exscan, again look for max nodeid and min Pc on previous ranks
-          auto prevMinPc = mxx::exscan(firstElementOfLastBucket, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>(), comm);  
+          //Second, do exscan, look for max nodeid and min Pc on previous ranks
+          auto prevMinPc = mxx::exscan(minPcOfLastBucket, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>(), comm);  
+
+          //We also need to know max Pc of the first bucket on the next rank (to check for stability)
+          auto maxPcOfFirstBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>());
+
+          //reverse exscan, look for min nodeid and max Pc on forward ranks
+          auto nextMaxPc = mxx::exscan(maxPcOfFirstBucket,  TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>(), comm.reverse()); 
+
+
 
           //Now we can update the Pn layer of all the buckets locally
-          for(auto it = tupleVector.begin(); it !=  tupleVector.end();)
+          for(auto it = begin; it !=  end;)
           {
             //Range of tuples with the same node id
-            auto equalRange = conn::utils::findRange(it, tupleVector.end(), *it, TpleComp<cclTupleIds::nId>());
+            auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::nId>());
 
             //Range would include atleast 1 element
             assert(std::distance(equalRange.first, equalRange.second) >= 1);
-            
-            //Minimum from local bucket
-            auto thisBucketsMinPc = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pc>());
 
-            //Compare against the exscanned value (choose exscan value if it has equal node id and lesser pn)
-            //This check will be meaningful only for the first local bucket
-            auto getLowerTupleValue = TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>() (prevMinPc, thisBucketsMinPc);
+            //Minimum Pc from local bucket
+            auto thisBucketsMinPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pc>());
 
-            //Update this bucket
-            std::for_each(equalRange.first, equalRange.second, [&getLowerTupleValue](T &e){
-                std::get<cclTupleIds::Pn>(e) = std::get<cclTupleIds::Pc>(getLowerTupleValue);
-                });
+            //Maximum Pc from local bucket
+            auto thisBucketsMaxPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pc, std::greater>());
+
+            //For now, mark global minimum as local
+            auto thisBucketsMaxPcGlobal = thisBucketsMaxPcLocal;
+            auto thisBucketsMinPcGlobal = thisBucketsMinPcLocal;
+
+            //Treat first, last buckets as special cases
+            if(equalRange.first == begin)
+            {
+              //Use value from previous rank
+              thisBucketsMinPcGlobal =  comm.rank() == 0 ? thisBucketsMinPcLocal : TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>() (prevMinPc, thisBucketsMinPcLocal);
+            }
+
+            if(equalRange.second == end)
+            {
+              //Use value from next rank
+              thisBucketsMaxPcGlobal = comm.rank() == comm.size() - 1 ? thisBucketsMaxPcLocal : TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>() (nextMaxPc, thisBucketsMaxPcLocal);
+
+            }
+
+            //If min Pc < max Pc for this bucket, update Pn or else mark them as stable
+            if(TpleComp<cclTupleIds::Pc>()(thisBucketsMinPcGlobal, thisBucketsMaxPcGlobal))
+              std::for_each(equalRange.first, equalRange.second, [&](T &e){
+                  std::get<cclTupleIds::Pn>(e) = std::get<cclTupleIds::Pc>(thisBucketsMinPcGlobal);
+                  });
+            else
+              std::for_each(equalRange.first, equalRange.second, [&](T &e){
+                  std::get<cclTupleIds::Pn>(e) = MAX2;
+                  });
 
             //Advance the loop pointer
             it = equalRange.second;
@@ -216,61 +263,81 @@ namespace conn
 
         /**
          * @brief     update the Pc layer by choosing min Pn
+         * @param[in] begin   To iterate over the vector of tuples, marks the range of active tuples 
+         * @param[in] end     end iterator
          * @return    bool value, true if the algorithm is converged
          */
-        bool updatePc(mxx::comm comm = mxx::comm())
-        {
-          //converged yet
-          uint8_t converged = 1;    // 1 means true, we will update it below
-
-          //Sort by Pc
-          mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm); 
-
-          //We need to run a exscan over first element of last bucket to resolve boundary splits
-          //Find the element with max Pc and min Pn locally 
-          auto firstElementOfLastBucket = mxx::local_reduce(tupleVector.begin(), tupleVector.end(), TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>());
-
-          //Result of exscan, again look for max Pc and min Pn on previous ranks
-          auto prevMinPc = mxx::exscan(firstElementOfLastBucket, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
-
-          //Now we can update the Pn layer of all the buckets locally
-          for(auto it = tupleVector.begin(); it !=  tupleVector.end();)
+        template <typename Iterator>
+          bool updatePc(Iterator begin, Iterator end, mxx::comm comm = mxx::comm())
           {
-            //Range of tuples with the same Pc
-            auto equalRange = conn::utils::findRange(it, tupleVector.end(), *it, TpleComp<cclTupleIds::Pc>());
+            //converged yet
+            uint8_t converged = 1;    // 1 means true, we will update it below
 
-            //Range would include atleast 1 element
-            assert(std::distance(equalRange.first, equalRange.second) >= 1);
+            //Sort by Pc, Pn
+            mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::Pc, cclTupleIds::Pn>(), comm); 
+
+            //Resolve last bucket's boundary split
             
-            //Minimum from local bucket
-            auto thisBucketsMinPc = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pn>());
+            //First, find the element with max Pc and min Pn locally 
+            //Or in other words, get the min Pn of the last bucket
+            auto minPnOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>());
 
-            //Compare against the exscanned value (choose exscan value if it has equal node id and lesser pn)
-            //This check will be meaningful only for the first local bucket
-            auto getLowerTupleValue = TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPc, thisBucketsMinPc);
+            //Result of exscan, again look for max Pc and min Pn on previous ranks
+            auto prevMinPn = mxx::exscan(minPnOfLastBucket, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
 
-            //Update this bucket (merge the partition Pc with new min Pn)
-            std::for_each(equalRange.first, equalRange.second, [&getLowerTupleValue, &converged](T &e){
+            //Now we can update the Pc layer of all the buckets locally
+            for(auto it = begin; it !=  end;)
+            {
+              //Range of tuples with the same Pc
+              auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::Pc>());
 
-                //Check for termination
-                auto oldPc = std::get<cclTupleIds::Pc>(e);
-                auto newPc = std::get<cclTupleIds::Pn>(getLowerTupleValue);
-                if(oldPc != newPc) converged = 0;
+              //Range would include atleast 1 element
+              assert(std::distance(equalRange.first, equalRange.second) >= 1);
 
-                //Update the Pc value
-                std::get<cclTupleIds::Pc>(e) = std::get<cclTupleIds::Pn>(getLowerTupleValue);
-                });
 
-            //Advance the loop pointer
-            it = equalRange.second;
+              //Minimum Pn from local bucket
+              auto thisBucketsMinPnLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pn>());
+
+              //For now, mark global minimum as local
+              auto thisBucketsMinPnGlobal = thisBucketsMinPnLocal;
+
+              //Treat first, last buckets as special cases
+              if(equalRange.first == begin)
+              {
+                //Use value from previous rank
+                thisBucketsMinPnGlobal =  comm.rank() == 0 ? thisBucketsMinPnLocal : TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
+              }
+
+              //If min Pn < MAX2 for this bucket, update the Pc to new value or else mark the partition as stable
+              if(std::get<cclTupleIds::Pn>(thisBucketsMinPnGlobal) < MAX2) {
+                converged = 0;
+                std::for_each(equalRange.first, equalRange.second, [&](T &e){
+                    std::get<cclTupleIds::Pc>(e) = std::get<cclTupleIds::Pn>(thisBucketsMinPnGlobal);
+                    });
+              }
+              else
+                std::for_each(equalRange.first, equalRange.second, [&](T &e){
+                    std::get<cclTupleIds::Pn>(e) = MAX;
+                    });
+
+              //Advance the loop pointer
+              it = equalRange.second;
+            }
+
+            //Know convergence of all the ranks
+            uint8_t allConverged;
+            mxx::allreduce(&converged, 1, &allConverged, mxx::min<uint8_t>());
+
+            return (allConverged == 1  ? true : false);
           }
 
-          //Know convergence of all the ranks
-          uint8_t allConverged;
-          mxx::allreduce(&converged, 1, &allConverged, mxx::min<uint8_t>());
-
-          return (allConverged == 1  ? true : false);
-        }
+        template <typename Iterator>
+          Iterator partitionStableTuples(Iterator begin, Iterator end, mxx::comm comm = mxx::comm())
+          {
+            return std::partition(begin, end, [&](const T &e){
+                return std::get<cclTupleIds::Pn>(e) == MAX;
+                });
+          }
     };
 
   }
