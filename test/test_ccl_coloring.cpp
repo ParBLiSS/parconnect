@@ -76,10 +76,14 @@ TEST(connColoring, smallUndirected) {
   }
 
   std::random_shuffle(edgeList.begin(), edgeList.end());
-  conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList);
-  cclInstance.compute();
-  auto component_count = cclInstance.getComponentCount();
-  ASSERT_EQ(3, component_count);
+
+  //Since we have a graph of small size, use less processes
+  c.with_subset(c.rank() < 4, [&](const mxx::comm& comm){
+      conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList, comm);
+      cclInstance.compute();
+      auto component_count = cclInstance.getComponentCount();
+      ASSERT_EQ(3, component_count);
+      });
 }
 
 /**
@@ -143,7 +147,7 @@ TEST(connColoring, mediumUndirected) {
   }
 
   std::random_shuffle(edgeList.begin(), edgeList.end());
-  conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList);
+  conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList, c);
   cclInstance.compute();
   auto component_count = cclInstance.getComponentCount();
   ASSERT_EQ(3, component_count);

@@ -47,6 +47,9 @@ namespace conn
         //Type for saving node ids
         using nodeIdType = nIdType;
 
+        //This is the communicator which participates for computing the components
+        mxx::comm comm;
+
       private:
 
         using T = std::tuple<pIdtype, pIdtype, nodeIdType>;
@@ -61,19 +64,23 @@ namespace conn
         pIdtype MAX2 = std::numeric_limits<pIdtype>::max() -1 ;
 
       public:
-        //Constructor
+        /**
+         * @brief                 public constructor
+         * @param[in] edgeList    distributed vector of edges
+         * @param[in] c           mpi communicator for the execution 
+         */
         template <typename edgeListPairsType>
-        ccl(edgeListPairsType &edgeList) 
+        ccl(edgeListPairsType &edgeList, const mxx::comm &c) : comm(c.copy()) 
         {
           //Parse the edgeList
           convertEdgeListforCCL(edgeList);
 
           //Re-distribute the tuples uniformly across the ranks
-          mxx::distribute_inplace(tupleVector, mxx::comm());
+          mxx::distribute_inplace(tupleVector, comm);
         }
 
         //Compute the connected component labels
-        void compute(mxx::comm comm = mxx::comm())
+        void compute()
         {
           //Size of vector should be >= 0
           assert(tupleVector.begin() != tupleVector.end());
@@ -90,11 +97,20 @@ namespace conn
         std::size_t getComponentCount()
         {
           //Vector should be sorted by Pc
-          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>()))
-            mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>());
+          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm))
+            mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm);
 
           //Count unique Pc values
-          return mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  TpleComp<cclTupleIds::Pc>());
+          return mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  TpleComp<cclTupleIds::Pc>(), comm);
+        }
+
+        /**
+         * @brief     Free the communicator
+         * @note      Its mandatory to call this function 
+         */
+        void free_comm()
+        {
+          comm.~comm();
         }
 
       private:
@@ -106,9 +122,9 @@ namespace conn
          *            We ignore the bucket splits across ranks here, because that shouldn't affect the correctness and complexity
          */
         template <typename edgeListPairsType>
-        void convertEdgeListforCCL(edgeListPairsType &edgeList, mxx::comm comm = mxx::comm())
+        void convertEdgeListforCCL(edgeListPairsType &edgeList)
         {
-          mxx::section_timer timer;
+          mxx::section_timer timer(std::cerr, comm);
 
           //Sort the edgeList by src id of each edge
           mxx::sort(edgeList.begin(), edgeList.end(), TpleComp<edgeListTIds::src>(), comm); 
@@ -137,7 +153,7 @@ namespace conn
           timer.end_section("vector of tuples initialized for ccl");
 
           //Log the total count of tuples 
-          auto totalTupleCount = mxx::reduce(tupleVector.size(), 0);
+          auto totalTupleCount = mxx::reduce(tupleVector.size(), 0, comm);
 
           LOG_IF(comm.rank() == 0, INFO) << "Total tuple count is " << totalTupleCount;
         }
@@ -145,13 +161,13 @@ namespace conn
         /**
          * @brief     run the iterative algorithm for ccl
          */
-        void runConnectedComponentLabeling(mxx::comm comm = mxx::comm())
+        void runConnectedComponentLabeling()
         {
           bool converged = false;
 
           int iterCount = 0;
 
-          mxx::section_timer timer;
+          mxx::section_timer timer(std::cerr, comm);
 
           auto begin = tupleVector.begin();
           auto end = tupleVector.end();
@@ -159,9 +175,9 @@ namespace conn
 
           while(!converged)
           {
-            updatePn( mid , end );
+            updatePn(mid, end);
 
-            converged = updatePc( mid , end );
+            converged = updatePc(mid, end);
 
             //parition the dataset into stable and active paritions, if optimization is enabled
             if(!converged && (OPTIMIZATION == opt_level::stable_partition_removed || OPTIMIZATION == opt_level::loadbalanced))
@@ -180,7 +196,6 @@ namespace conn
           }
 
           timer.end_section("Coloring done");
-          //std::cout << tupleVector << "\n";
 
           LOG_IF(comm.rank() == 0, INFO) << "Iteration count " << iterCount;
         }
@@ -191,7 +206,7 @@ namespace conn
          * @param[in] end     end iterator
          */
         template <typename Iterator>
-        void updatePn(Iterator begin, Iterator end, mxx::comm comm = mxx::comm())
+        void updatePn(Iterator begin, Iterator end)
         {
           //Sort by nid,Pc
           mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::nId, cclTupleIds::Pc>(), comm); 
@@ -210,8 +225,6 @@ namespace conn
 
           //reverse exscan, look for min nodeid and max Pc on forward ranks
           auto nextMaxPc = mxx::exscan(maxPcOfFirstBucket,  TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>(), comm.reverse()); 
-
-
 
           //Now we can update the Pn layer of all the buckets locally
           for(auto it = begin; it !=  end;)
@@ -268,7 +281,7 @@ namespace conn
          * @return    bool value, true if the algorithm is converged
          */
         template <typename Iterator>
-          bool updatePc(Iterator begin, Iterator end, mxx::comm comm = mxx::comm())
+          bool updatePc(Iterator begin, Iterator end)
           {
             //converged yet
             uint8_t converged = 1;    // 1 means true, we will update it below
@@ -326,13 +339,13 @@ namespace conn
 
             //Know convergence of all the ranks
             uint8_t allConverged;
-            mxx::allreduce(&converged, 1, &allConverged, mxx::min<uint8_t>());
+            mxx::allreduce(&converged, 1, &allConverged, mxx::min<uint8_t>(), comm);
 
             return (allConverged == 1  ? true : false);
           }
 
         template <typename Iterator>
-          Iterator partitionStableTuples(Iterator begin, Iterator end, mxx::comm comm = mxx::comm())
+          Iterator partitionStableTuples(Iterator begin, Iterator end)
           {
             return std::partition(begin, end, [&](const T &e){
                 return std::get<cclTupleIds::Pn>(e) == MAX;

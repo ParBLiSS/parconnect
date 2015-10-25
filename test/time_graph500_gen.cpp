@@ -27,16 +27,13 @@ int main(int argc, char** argv)
   // Initialize the MPI library:
   MPI_Init(&argc, &argv);
 
-  //Know the rank and comm size
-  int p, rank;
-  MPI_Comm_size(MPI_COMM_WORLD, &p);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
+  //Initialize the communicator
+  mxx::comm comm = mxx::comm();
 
   //Print mpi rank distribution
   mxx::print_node_distribution();
 
-  LOG_IF(!rank, INFO) << "Code to check kronecker graph generation";
+  LOG_IF(!comm.rank(), INFO) << "Code to check kronecker graph generation";
 
   //Parse command line arguments
   ArgvParser cmd;
@@ -52,7 +49,7 @@ int main(int argc, char** argv)
   //Make sure we get the right command line args
   if (result != ArgvParser::NoParserError)
   {
-    if (!rank) cout << cmd.parseErrorDescription(result) << "\n";
+    if (!comm.rank()) cout << cmd.parseErrorDescription(result) << "\n";
     exit(1);
   }
 
@@ -67,11 +64,11 @@ int main(int argc, char** argv)
   std::vector< std::pair<int64_t, int64_t> > edgeList;
 
   //Populate the edgeList
-  g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED); 
+  g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED, comm); 
 
   //Sum up the edge count across ranks
-  auto totalEdgeCount = mxx::reduce(edgeList.size(), 0);
-  LOG_IF(!rank, INFO) << "Total edge count is " << totalEdgeCount;
+  auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
+  LOG_IF(!comm.rank(), INFO) << "Total edge count is " << totalEdgeCount;
 
   MPI_Finalize();
   return(0);

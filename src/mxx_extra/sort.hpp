@@ -54,7 +54,7 @@ namespace mxx {
       });
 
       size_t uniqueCountGlobal;
-      mxx::allreduce(&uniqueCountLocal, 1, &uniqueCountGlobal);
+      mxx::allreduce(&uniqueCountLocal, 1, &uniqueCountGlobal ,comm);
       return uniqueCountGlobal;
     }
 
