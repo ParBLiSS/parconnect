@@ -47,6 +47,8 @@ namespace conn
         //Type for saving node ids
         using nodeIdType = nIdType;
 
+      private:
+
         //This is the communicator which participates for computing the components
         mxx::comm comm;
 
