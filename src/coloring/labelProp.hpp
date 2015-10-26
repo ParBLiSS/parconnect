@@ -52,6 +52,9 @@ namespace conn
         //This is the communicator which participates for computing the components
         mxx::comm comm;
 
+        //Number of components
+        std::size_t componentCount;
+
       private:
 
         using T = std::tuple<pIdtype, pIdtype, nodeIdType>;
@@ -81,41 +84,44 @@ namespace conn
           mxx::distribute_inplace(tupleVector, comm);
         }
 
-        //Compute the connected component labels
+        /**
+         * @brief   Compute the connected component labels
+         * @note    Note that the communicator is freed after the computation
+         */
         void compute()
         {
           //Size of vector should be >= 0
           assert(tupleVector.begin() != tupleVector.end());
 
           runConnectedComponentLabeling();
+
+          //Save the component count
+          computeComponentCount();
+
+          //Free the communicator
+          free_comm();
         }
 
         /**
          * @brief     count the components in the graph after ccl (useful for debugging/testing)
          * @return    count 
          * @note      should be called after computing connected components. 
-         *            assumes vector is sorted by Pc
          */
         std::size_t getComponentCount()
         {
-          //Vector should be sorted by Pc
-          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm))
-            mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm);
-
-          //Count unique Pc values
-          return mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  TpleComp<cclTupleIds::Pc>(), comm);
+          return componentCount;
         }
+
+      private:
 
         /**
          * @brief     Free the communicator
-         * @note      Its mandatory to call this function 
+         * @note      Need to make sure that the communicator is freed before MPI_Finalize 
          */
         void free_comm()
         {
           comm.~comm();
         }
-
-      private:
 
         /**
          * @brief     converts the edgelist to vector of tuples needed for ccl
@@ -353,6 +359,20 @@ namespace conn
                 return std::get<cclTupleIds::Pn>(e) == MAX;
                 });
           }
+
+        /**
+         * @brief     count the components in the graph after ccl (useful for debugging/testing)
+         * @note      should be called after computing connected components. 
+         */
+        void computeComponentCount()
+        {
+          //Vector should be sorted by Pc
+          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm))
+            mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm);
+
+          //Count unique Pc values
+          componentCount =  mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  TpleComp<cclTupleIds::Pc>(), comm);
+        }
     };
 
   }

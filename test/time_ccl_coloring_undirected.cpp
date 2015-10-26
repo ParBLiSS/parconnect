@@ -76,7 +76,6 @@ int main(int argc, char** argv)
   //Compute connected components
   conn::coloring::ccl<uint32_t, uint64_t> cclInstance(edgeList, comm);
   cclInstance.compute();
-  cclInstance.free_comm();
 
   MPI_Finalize();
   return(0);
