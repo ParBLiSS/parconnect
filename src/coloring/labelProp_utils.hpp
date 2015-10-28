@@ -45,6 +45,15 @@ namespace conn
       stable_partition_removed,  //removes stable partitions from the working set
       loadbalanced    //enables load balance, recommended setting, used by default
     };
+
+    /**
+     * @brief   On and off switch
+     */
+    enum lever
+    {
+      OFF,
+      ON
+    };
   }
 }
 

@@ -16,6 +16,39 @@
 INITIALIZE_EASYLOGGINGPP
 
 /**
+ * @brief       coloring of undirected graph with a small chain
+ * @details     builds a small undirected chain, 
+ *              test if program returns 1 as the component count
+ */
+TEST(connColoring, smallUndirectedChain) {
+
+  mxx::comm c = mxx::comm();
+
+  //Declare a edgeList vector to save edges
+  std::vector< std::pair<int64_t, int64_t> > edgeList;
+
+  using edgeIdType = int64_t;
+  using pIdType = uint32_t;
+
+  //Start adding the edges
+  if (c.rank() == 0) {
+
+    //Chain (chain 1-2-...1000)
+    for(int i = 1; i < 1000 ; i++)
+    {
+      edgeList.emplace_back(i, i+1);
+      edgeList.emplace_back(i+1, i);
+    }
+  }
+
+  std::random_shuffle(edgeList.begin(), edgeList.end());
+  conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList, c);
+  cclInstance.compute();
+  auto component_count = cclInstance.getComponentCount();
+  ASSERT_EQ(1, component_count);
+}
+
+/**
  * @brief       coloring of undirected graph with 3 components
  * @details     builds a small test graph with three components, 
  *              test if program returns 3 as the component count
@@ -152,5 +185,4 @@ TEST(connColoring, mediumUndirected) {
   auto component_count = cclInstance.getComponentCount();
   ASSERT_EQ(3, component_count);
 }
-
 

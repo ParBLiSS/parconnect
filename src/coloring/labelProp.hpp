@@ -36,8 +36,9 @@ namespace conn
      * @tparam[in]  pIdtype       type used for partition ids
      * @tparam[in]  nIdType       type used for node id
      * @tparam[in]  OPTIMIZATION  optimization level for benchmarking, use loadbalanced for the best version 
+     * @tparam[in]  DOUBLING      controls whether pointer doubling would be executed or not, 'ON' by default.
      */
-    template<typename pIdtype = uint32_t, typename nIdType = uint64_t, uint8_t OPTIMIZATION = opt_level::loadbalanced>
+    template<typename pIdtype = uint32_t, typename nIdType = uint64_t, uint8_t OPTIMIZATION = opt_level::loadbalanced, uint8_t DOUBLING = lever::ON>
     class ccl 
     {
       public:
@@ -62,11 +63,14 @@ namespace conn
 
         //Used during initialization of <Pn>
         //Also used to mark partitions as stable
-        pIdtype MAX = std::numeric_limits<pIdtype>::max();
+        pIdtype MAX_PID = std::numeric_limits<pIdtype>::max();
 
         //Used to mark tuples as stable 
         //partitions would become stable if all its tuples are stable
-        pIdtype MAX2 = std::numeric_limits<pIdtype>::max() -1 ;
+        pIdtype MAX_PID2 = std::numeric_limits<pIdtype>::max() -1 ;
+
+        //Used to mark the special tuples used during doubling
+        nodeIdType MAX_NID = std::numeric_limits<nodeIdType>::max();
 
       public:
         /**
@@ -116,7 +120,7 @@ namespace conn
 
         /**
          * @brief     Free the communicator
-         * @note      Need to make sure that the communicator is freed before MPI_Finalize 
+         * @note      Required to make sure that the communicator is freed before MPI_Finalize 
          */
         void free_comm()
         {
@@ -149,11 +153,11 @@ namespace conn
             assert(std::distance(equalRange.first, equalRange.second) >= 1);
 
             //Insert the self loop
-            tupleVector.emplace_back(std::get<edgeListTIds::src>(*it), MAX, std::get<edgeListTIds::src>(*it)); 
+            tupleVector.emplace_back(std::get<edgeListTIds::src>(*it), MAX_PID, std::get<edgeListTIds::src>(*it)); 
 
             //Insert other vertex members in this partition 
             for(auto it2 = equalRange.first; it2 != equalRange.second; it2++)
-              tupleVector.emplace_back(std::get<edgeListTIds::src>(*it2), MAX, std::get<edgeListTIds::dst>(*it2));;
+              tupleVector.emplace_back(std::get<edgeListTIds::src>(*it2), MAX_PID, std::get<edgeListTIds::dst>(*it2));;
 
             it = equalRange.second;
           }
@@ -171,34 +175,59 @@ namespace conn
          */
         void runConnectedComponentLabeling()
         {
+          //variable to track convergence
           bool converged = false;
 
+          //counting iterations
           int iterCount = 0;
 
           mxx::section_timer timer(std::cerr, comm);
 
-          auto begin = tupleVector.begin();
-          auto end = tupleVector.end();
-          auto mid = begin;   //range mid-end represents active partitions
+          //range [tupleVector.begin() -- tupleVector.begin() + distance_begin_mid) marks the set of stable partitions in the vector
+          //range [tupleVector.begin() + distance_begin_mid -- tupleVector.end()) denotes the active tuples 
+          //Initially all the tuples are active, therefore we set distance_begin_mid to 0
+          std::size_t distance_begin_mid = 0;
 
           while(!converged)
           {
-            updatePn(mid, end);
+            //Temporary storage for extra tuples needed for doubling
+            std::vector<T> parentRequestTupleVector;
 
-            converged = updatePc(mid, end);
+            //Define the iterators over tupleVector
+            auto begin = tupleVector.begin();
+            auto mid = tupleVector.begin() + distance_begin_mid;
+            auto end = tupleVector.end();
+
+            //Update Pn layer (Explore neighbors of a node and find potential partition candidates
+            updatePn(mid, tupleVector.end());
+
+            //Update the Pc layer, choose the best candidate
+            converged = updatePc(mid, tupleVector.end(),parentRequestTupleVector);
+
+            //Perform pointer doubling if enabled
+            if(DOUBLING)
+              doPointerDoubling(distance_begin_mid, parentRequestTupleVector);
+
+            //IMPORTANT : iterators over tupleVector are invalid and need to be redefined
+            //Why? Because vector could undergo reallocation during pointer doubling
+            
+            begin = tupleVector.begin();
+            mid = tupleVector.begin() + distance_begin_mid;
+            end = tupleVector.end();
 
             //parition the dataset into stable and active paritions, if optimization is enabled
             if(!converged && (OPTIMIZATION == opt_level::stable_partition_removed || OPTIMIZATION == opt_level::loadbalanced))
             {
               //use std::partition to move stable tuples to the left
-              //After this step, mid-end would represent active tuples
-              mid = partitionStableTuples( mid, end );
+              mid = partitionStableTuples<cclTupleIds::Pn>(mid, end);
 
               if(OPTIMIZATION == opt_level::loadbalanced)
+              {
                 mid = mxx::block_decompose_partitions(begin, mid, end, comm);
                 //Re distributed the tuples to balance the load across the ranks
+              }
             }
-
+            distance_begin_mid = std::distance(begin, mid);
 
             iterCount ++;
           }
@@ -274,7 +303,7 @@ namespace conn
                   });
             else
               std::for_each(equalRange.first, equalRange.second, [&](T &e){
-                  std::get<cclTupleIds::Pn>(e) = MAX2;
+                  std::get<cclTupleIds::Pn>(e) = MAX_PID2;
                   });
 
             //Advance the loop pointer
@@ -283,13 +312,14 @@ namespace conn
         }
 
         /**
-         * @brief     update the Pc layer by choosing min Pn
-         * @param[in] begin   To iterate over the vector of tuples, marks the range of active tuples 
-         * @param[in] end     end iterator
-         * @return    bool value, true if the algorithm is converged
+         * @brief                             update the Pc layer by choosing min Pn
+         * @param[in] begin                   To iterate over the vector of tuples, marks the range of active tuples 
+         * @param[in] end                     end iterator
+         * @param[in] partitionStableTuples   storate to keep 'parentRequest' tuples for doubling
+         * @return                            bool value, true if the algorithm is converged
          */
         template <typename Iterator>
-          bool updatePc(Iterator begin, Iterator end)
+          bool updatePc(Iterator begin, Iterator end, std::vector<T>& parentRequestTupleVector)
           {
             //converged yet
             uint8_t converged = 1;    // 1 means true, we will update it below
@@ -306,6 +336,7 @@ namespace conn
             //Result of exscan, again look for max Pc and min Pn on previous ranks
             auto prevMinPn = mxx::exscan(minPnOfLastBucket, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
 
+
             //Now we can update the Pc layer of all the buckets locally
             for(auto it = begin; it !=  end;)
             {
@@ -314,7 +345,6 @@ namespace conn
 
               //Range would include atleast 1 element
               assert(std::distance(equalRange.first, equalRange.second) >= 1);
-
 
               //Minimum Pn from local bucket
               auto thisBucketsMinPnLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pn>());
@@ -326,20 +356,33 @@ namespace conn
               if(equalRange.first == begin)
               {
                 //Use value from previous rank
-                thisBucketsMinPnGlobal =  comm.rank() == 0 ? thisBucketsMinPnLocal : TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
+                thisBucketsMinPnGlobal =  comm.rank() == 0 ?  thisBucketsMinPnLocal : 
+                  TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
               }
 
-              //If min Pn < MAX2 for this bucket, update the Pc to new value or else mark the partition as stable
-              if(std::get<cclTupleIds::Pn>(thisBucketsMinPnGlobal) < MAX2) {
+              //If min Pn < MAX_PID2 for this bucket, update the Pc to new value or else mark the partition as stable
+              if(std::get<cclTupleIds::Pn>(thisBucketsMinPnGlobal) < MAX_PID2) 
+              {
+
+                //Algorithm not converged yet because we found an active partition
                 converged = 0;
+
+                //Update Pc
                 std::for_each(equalRange.first, equalRange.second, [&](T &e){
                     std::get<cclTupleIds::Pc>(e) = std::get<cclTupleIds::Pn>(thisBucketsMinPnGlobal);
                     });
+
+                //Insert a 'parentRequest' tuple in the vector for doubling
+                if(DOUBLING)
+                  parentRequestTupleVector.emplace_back(MAX_PID, MAX_PID, std::get<cclTupleIds::Pn>(thisBucketsMinPnGlobal));
               }
               else
+              {
+                //stable
                 std::for_each(equalRange.first, equalRange.second, [&](T &e){
-                    std::get<cclTupleIds::Pn>(e) = MAX;
+                    std::get<cclTupleIds::Pn>(e) = MAX_PID;
                     });
+              }
 
               //Advance the loop pointer
               it = equalRange.second;
@@ -352,11 +395,119 @@ namespace conn
             return (allConverged == 1  ? true : false);
           }
 
-        template <typename Iterator>
+        /**
+         * @brief                               Function that performs the pointer doubling
+         *
+         * @details                             
+         *                                      'parentRequest' tuples serve the purpose of fetching parent of a partition
+         *                                      In the beginning, they have the format <MAX_PID, MAX_PID, newPc>
+         *                                      Goal is to 
+         *                                        1.  Update the Pn layer of this tuple with the partition id of node newPc
+         *                                            Since there could be multiple partition ids of a node 
+         *                                            (because a node can belong to multiple partitions at an instant),
+         *                                            we pick the minimum of them
+         *                                            This would require cut-pasting all the tuples from parentRequestTupleVector to tupleVector
+         *                                        2.  Flip the 'parentRequest' tuples and update the partition newPc to the value obtained above
+         *                                        3.  Make sure to delete the 'parentRequest' tuples from tupleVector
+         *
+         * @param[in] beginOffset               tupleVector.begin() + beginOffset would denote the begin iterator for active tuples
+         * @param[in] parentRequestTupleVector  All the 'parentRequest' tuples
+         */
+        void doPointerDoubling(std::size_t beginOffset, std::vector<T>& parentRequestTupleVector)
+          {
+            //Copy the tuples from parentRequestTupleVector to tupleVector 
+            tupleVector.insert(tupleVector.end(), parentRequestTupleVector.begin(), parentRequestTupleVector.end());
+
+            //Range of active tuples in tupleVector needs to be updated 
+            auto begin = tupleVector.begin() + beginOffset;
+            auto end = tupleVector.end();
+
+            //1. Repeat the procedure of updatePn, but just modify the 'parentRequest' tuples
+            //   We can distinguish the 'parentRequest' tuples as they have Pc = MAX_PID
+
+            //Same code as updatePn()
+            mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::nId, cclTupleIds::Pc>(), comm); 
+            auto minPcOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>());
+            auto prevMinPc = mxx::exscan(minPcOfLastBucket, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>(), comm);  
+            for(auto it = begin; it !=  end;)
+            {
+              auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::nId>());
+              auto thisBucketsMinPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pc>());
+              auto thisBucketsMinPcGlobal = thisBucketsMinPcLocal;
+              if(equalRange.first == begin)
+              {
+                thisBucketsMinPcGlobal =  comm.rank() == 0 ? thisBucketsMinPcLocal : 
+                  TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>() (prevMinPc, thisBucketsMinPcLocal);
+              }
+
+              std::for_each(equalRange.first, equalRange.second, [&](T &e){
+                    if(std::get<cclTupleIds::Pc>(e) == MAX_PID)
+                    {
+                      std::get<cclTupleIds::Pn>(e) = std::get<cclTupleIds::Pc>(thisBucketsMinPcGlobal);
+
+                      //flip this 'parentRequest' tuple
+                      std::get<cclTupleIds::Pc>(e) =  std::get<cclTupleIds::nId>(e);
+                      std::get<cclTupleIds::nId>(e) =  MAX_NID;
+                    }
+                  });
+              it = equalRange.second;
+            }
+
+            //2. Now repeat the procedure of updatePc()
+            mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::Pc, cclTupleIds::Pn>(), comm); 
+            auto minPnOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>());
+            auto prevMinPn = mxx::exscan(minPnOfLastBucket, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
+            for(auto it = begin; it !=  end;)
+            {
+              auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::Pc>());
+              auto thisBucketsMinPnLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pn>());
+              auto thisBucketsMinPnGlobal = thisBucketsMinPnLocal;
+              if(equalRange.first == begin)
+              {
+                thisBucketsMinPnGlobal =  comm.rank() == 0 ?  thisBucketsMinPnLocal : 
+                  TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
+
+              }
+    
+              //Here is the code which updates the Pc for pointer jumping
+              //Ignore the stable partitions
+              if(std::get<cclTupleIds::Pn>(*equalRange.first) != MAX_PID)
+                std::for_each(equalRange.first, equalRange.second, [&](T &e){
+                    std::get<cclTupleIds::Pc>(e) = std::get<cclTupleIds::Pn>(thisBucketsMinPnGlobal);
+                    });
+
+              it = equalRange.second;
+            }
+
+            //3.  Now remove the 'parentRequest' tuples from tupleVector
+            //    We can distinguish the 'parentRequest' tuples as they have nId = MAX_NID
+            
+            //operator should be '!=' because we want 'parentRequest' tuples to move towards right for deletion later
+            auto mid = partitionStableTuples<cclTupleIds::nId, std::not_equal_to>(begin,end);
+
+            //Erase the 'parentRequest' tuples
+            tupleVector.erase(mid, end);
+          }
+
+        /*
+         * @brief               partition the tuple array
+         * @tparam[in]  layer   the layer of tuple used to partition them
+         * @tparam[in]  op      binary operator that takes tuple_value and max
+         *
+         * @details             if op(value, max) is true, element is moved to left half                
+         */
+        template <uint8_t layer, template<typename> class op = std::equal_to, typename Iterator>
           Iterator partitionStableTuples(Iterator begin, Iterator end)
           {
+            //type of the tuple_element at index layer
+            using eleType = typename std::tuple_element<layer, T>::type;
+
+            //max value
+            auto max = std::numeric_limits<eleType>::max();
+
+            //do the partition
             return std::partition(begin, end, [&](const T &e){
-                return std::get<cclTupleIds::Pn>(e) == MAX;
+                return op<eleType>()(std::get<layer>(e), max);
                 });
           }
 
