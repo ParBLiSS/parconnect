@@ -1,5 +1,5 @@
 /**
- * @file    time_ccl_coloring_undirected.cpp
+ * @file    time_ccl_coloring_undirected_graph500.cpp
  * @ingroup group
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Computes connected components in the synthetic undirected kronecker graph
@@ -63,8 +63,11 @@ int main(int argc, char** argv)
   //Object of the graph500 generator class
   conn::graphGen::graph500Gen g;
 
+  //graph500 generator only uses int64_t
+  using nodeIdType = int64_t;
+
   //Declare a edgeList vector to save edges
-  std::vector< std::pair<int64_t, int64_t> > edgeList;
+  std::vector< std::pair<nodeIdType, nodeIdType> > edgeList;
 
   //Populate the edgeList
   g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED, comm); 
@@ -74,7 +77,7 @@ int main(int argc, char** argv)
   LOG_IF(!comm.rank(), INFO) << "Total edge count is " << totalEdgeCount;
 
   //Compute connected components
-  conn::coloring::ccl<uint32_t, uint64_t> cclInstance(edgeList, comm);
+  conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
   cclInstance.compute();
 
   MPI_Finalize();

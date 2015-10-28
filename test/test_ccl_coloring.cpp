@@ -27,7 +27,7 @@ TEST(connColoring, smallUndirectedChain) {
   //Declare a edgeList vector to save edges
   std::vector< std::pair<int64_t, int64_t> > edgeList;
 
-  using edgeIdType = int64_t;
+  using nodeIdType = int64_t;
   using pIdType = uint32_t;
 
   //Start adding the edges
@@ -42,7 +42,7 @@ TEST(connColoring, smallUndirectedChain) {
   }
 
   std::random_shuffle(edgeList.begin(), edgeList.end());
-  conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList, c);
+  conn::coloring::ccl<nodeIdType> cclInstance(edgeList, c);
   cclInstance.compute();
   auto component_count = cclInstance.getComponentCount();
   ASSERT_EQ(1, component_count);
@@ -60,8 +60,7 @@ TEST(connColoring, smallUndirected) {
   //Declare a edgeList vector to save edges
   std::vector< std::pair<int64_t, int64_t> > edgeList;
 
-  using edgeIdType = int64_t;
-  using pIdType = uint32_t;
+  using nodeIdType = int64_t;
 
   //Start adding the edges
   if (c.rank() == 0) {
@@ -112,7 +111,7 @@ TEST(connColoring, smallUndirected) {
 
   //Since we have a graph of small size, use less processes
   c.with_subset(c.rank() < 4, [&](const mxx::comm& comm){
-      conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList, comm);
+      conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
       cclInstance.compute();
       auto component_count = cclInstance.getComponentCount();
       ASSERT_EQ(3, component_count);
@@ -129,10 +128,7 @@ TEST(connColoring, mediumUndirected) {
   mxx::comm c = mxx::comm();
 
   //Declare a edgeList vector to save edges
-  std::vector< std::pair<int64_t, int64_t> > edgeList;
-
-  using edgeIdType = int64_t;
-  using pIdType = uint32_t;
+  std::vector< std::pair<uint64_t, uint64_t> > edgeList;
 
   //Start adding the edges
   if (c.rank() == 0) {
@@ -180,7 +176,7 @@ TEST(connColoring, mediumUndirected) {
   }
 
   std::random_shuffle(edgeList.begin(), edgeList.end());
-  conn::coloring::ccl<pIdType, edgeIdType> cclInstance(edgeList, c);
+  conn::coloring::ccl<> cclInstance(edgeList, c);
   cclInstance.compute();
   auto component_count = cclInstance.getComponentCount();
   ASSERT_EQ(3, component_count);

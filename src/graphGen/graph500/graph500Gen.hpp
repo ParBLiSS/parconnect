@@ -2,7 +2,7 @@
  * @file    graph500Gen.hpp
  * @ingroup group
  * @author  Chirag Jain <cjain7@gatech.edu>
- * @brief   Wrapper around code files for graph500 graph generator.
+ * @brief   Wrapper around code files for parallel graph500 graph generator.
  *
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
@@ -43,7 +43,7 @@ namespace conn
 
         /**
          * @brief                 populates the edge list vector 
-         * @param[out] edgeList    input vector to fill up
+         * @param[out] edgeList   input vector to fill up
          * @param[in] mode        choose between DIRECTED or UNDIRECTED
          * @param[in] scale       scale of the graph
          * @param[in] edgeFactor  edgeFactor of the graph

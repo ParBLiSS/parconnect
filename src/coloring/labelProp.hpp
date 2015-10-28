@@ -33,17 +33,17 @@ namespace conn
     /**
      * @class                     conn::coloring::ccl
      * @brief                     supports parallel connected component labeling using label propagation technique
-     * @tparam[in]  pIdtype       type used for partition ids
      * @tparam[in]  nIdType       type used for node id
      * @tparam[in]  OPTIMIZATION  optimization level for benchmarking, use loadbalanced for the best version 
      * @tparam[in]  DOUBLING      controls whether pointer doubling would be executed or not, 'ON' by default.
      */
-    template<typename pIdtype = uint32_t, typename nIdType = uint64_t, uint8_t OPTIMIZATION = opt_level::loadbalanced, uint8_t DOUBLING = lever::ON>
+    template<typename nIdType = uint64_t, uint8_t OPTIMIZATION = opt_level::loadbalanced, uint8_t DOUBLING = lever::ON>
     class ccl 
     {
       public:
         //Type for saving parition ids
-        using partitionIdtype = pIdtype;
+        //Defaulted to uint32_t, assuming we will never have more than 4 Billion partitions in the graph
+        using pIdtype = uint32_t;
 
         //Type for saving node ids
         using nodeIdType = nIdType;
@@ -78,9 +78,13 @@ namespace conn
          * @param[in] edgeList    distributed vector of edges
          * @param[in] c           mpi communicator for the execution 
          */
-        template <typename edgeListPairsType>
-        ccl(edgeListPairsType &edgeList, const mxx::comm &c) : comm(c.copy()) 
+        template <typename E>
+        ccl(std::vector<std::pair<E,E>> &edgeList, const mxx::comm &c) : comm(c.copy()) 
         {
+          //nodeIdType and E should match
+          //If they don't, modify the class type or the edgeList type
+          static_assert(std::is_same<E, nodeIdType>::value, "types must match");
+
           //Parse the edgeList
           convertEdgeListforCCL(edgeList);
 
