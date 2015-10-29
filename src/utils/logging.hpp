@@ -436,6 +436,7 @@ namespace type {
 #undef ELPP_LITERAL
 #undef ELPP_STRLEN
 #undef ELPP_COUT
+#define ELPP_CUSTOM_COUT std::cerr
 #if defined(ELPP_UNICODE)
 #   define ELPP_LITERAL(txt) L##txt
 #   define ELPP_STRLEN wcslen
@@ -2608,7 +2609,8 @@ public:
         setGlobally(ConfigurationType::MaxLogFileSize, std::string("0"), true);
         setGlobally(ConfigurationType::LogFlushThreshold, std::string("0"), true);
 
-        setGlobally(ConfigurationType::Format, std::string("%datetime %level [%logger] %msg"), true);
+        //CJ removed [logger] from print statement
+        setGlobally(ConfigurationType::Format, std::string("%datetime %level %msg"), true);
         set(Level::Debug, ConfigurationType::Format, std::string("%datetime %level [%logger] [%user@%host] [%func] [%loc] %msg"));
         // INFO and WARNING are set to default by Level::Global
         set(Level::Error, ConfigurationType::Format, std::string("%datetime %level [%logger] %msg"));

@@ -206,21 +206,24 @@ namespace conn
             auto mid = tupleVector.begin() + distance_begin_mid;
             auto end = tupleVector.end();
 
+            //Log the min, mean and max count of active tuples across ranks
+            printWorkLoad(mid, end);
+
             //Update Pn layer (Explore neighbors of a node and find potential partition candidates
             updatePn(mid, tupleVector.end());
 
-            timer2.end_section("Pn update done");
+            timer2.end_section("\tPn update done");
 
             //Update the Pc layer, choose the best candidate
             converged = updatePc(mid, tupleVector.end(),parentRequestTupleVector);
 
-            timer2.end_section("Pc update done");
+            timer2.end_section("\tPc update done");
 
             //Perform pointer doubling if enabled
             if(DOUBLING)
               doPointerDoubling(distance_begin_mid, parentRequestTupleVector);
 
-            timer2.end_section("Pointer doubling done");
+            timer2.end_section("\tPointer doubling done");
 
             //IMPORTANT : iterators over tupleVector are invalid and need to be redefined
             //Why? Because vector could undergo reallocation during pointer doubling
@@ -235,14 +238,14 @@ namespace conn
               //use std::partition to move stable tuples to the left
               mid = partitionStableTuples<cclTupleIds::Pn>(mid, end);
 
-              timer2.end_section("Stable partitons placed aside");
+              timer2.end_section("\tStable partitons placed aside");
 
               if(OPTIMIZATION == opt_level::loadbalanced)
               {
                 mid = mxx::block_decompose_partitions(begin, mid, end, comm);
                 //Re distributed the tuples to balance the load across the ranks
               
-                timer2.end_section("Load balanced");
+                timer2.end_section("\tLoad balanced");
               }
             }
             distance_begin_mid = std::distance(begin, mid);
@@ -542,6 +545,23 @@ namespace conn
           //Count unique Pc values
           componentCount =  mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  TpleComp<cclTupleIds::Pc>(), comm);
         }
+
+        /**
+         * @brief     Helper function to print the load distribution across ranks during the algorithm's exection
+         *            Prints the min, mean and max count of active tuples
+         */
+        template <typename Iterator, typename T = std::size_t>
+          void printWorkLoad(Iterator begin, Iterator end)
+          {
+            T localWorkLoad = std::distance(begin, end);
+
+            T maxLoad  = mxx::reduce(localWorkLoad, 0, mxx::max<T>() , comm);
+            T minLoad  = mxx::reduce(localWorkLoad, 0, mxx::min<T>() , comm);
+            T meanLoad = mxx::reduce(localWorkLoad, 0, std::plus<T>(), comm)/ comm.size();
+
+            auto sep = ",";
+            LOG_IF(comm.rank() == 0, INFO) << "Load distribution of active tuples min-mean-max : " << minLoad << sep << meanLoad << sep << maxLoad;
+          }
     };
 
   }
