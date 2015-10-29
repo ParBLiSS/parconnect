@@ -547,8 +547,9 @@ namespace conn
         }
 
         /**
-         * @brief     Helper function to print the load distribution across ranks during the algorithm's exection
-         *            Prints the min, mean and max count of active tuples
+         * @details   Helper function to print the load distribution i.e. the active tuples
+         *            across ranks during the algorithm's exection. Prints the min, mean and 
+         *            max count of the active tuples
          */
         template <typename Iterator, typename T = std::size_t>
           void printWorkLoad(Iterator begin, Iterator end)
@@ -562,6 +563,26 @@ namespace conn
             auto sep = ",";
             LOG_IF(comm.rank() == 0, INFO) << "Load distribution of active tuples min-mean-max : " << minLoad << sep << meanLoad << sep << maxLoad;
           }
+
+        /**
+         * @brief     Print verbose log of tuple counts on all the ranks (both active and inactive)
+         * @note      Use only while debugging
+         */
+        template <typename Iterator, typename T = std::size_t>
+          void printVerboseTupleCounts(Iterator begin, Iterator mid, Iterator end)
+          {
+            T inactiveTupleCount = std::distance(begin, mid);
+            T activeTupleCount = std::distance(mid, end);
+
+            std::pair<T,T> tupleCounts = std::make_pair(inactiveTupleCount, activeTupleCount);
+
+            //Gather to rank 0
+            auto gatherValues = mxx::gather(tupleCounts, 0, comm);
+
+            //Print the pairs 
+            if(!comm.rank()) std::cerr << gatherValues << std::endl; 
+          }
+
     };
 
   }
