@@ -1,0 +1,3 @@
+[submodule "ext/mxx"]
+	path = ext/mxx
+	url = git@github.com:cjain7/mxx.git

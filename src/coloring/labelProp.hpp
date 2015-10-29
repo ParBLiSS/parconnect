@@ -194,6 +194,10 @@ namespace conn
 
           while(!converged)
           {
+
+            LOG_IF(comm.rank() == 0, INFO) << "Iteration #" << iterCount + 1;
+            mxx::section_timer timer2(std::cerr, comm);
+
             //Temporary storage for extra tuples needed for doubling
             std::vector<T> parentRequestTupleVector;
 
@@ -205,12 +209,18 @@ namespace conn
             //Update Pn layer (Explore neighbors of a node and find potential partition candidates
             updatePn(mid, tupleVector.end());
 
+            timer2.end_section("Pn update done");
+
             //Update the Pc layer, choose the best candidate
             converged = updatePc(mid, tupleVector.end(),parentRequestTupleVector);
+
+            timer2.end_section("Pc update done");
 
             //Perform pointer doubling if enabled
             if(DOUBLING)
               doPointerDoubling(distance_begin_mid, parentRequestTupleVector);
+
+            timer2.end_section("Pointer doubling done");
 
             //IMPORTANT : iterators over tupleVector are invalid and need to be redefined
             //Why? Because vector could undergo reallocation during pointer doubling
@@ -225,10 +235,14 @@ namespace conn
               //use std::partition to move stable tuples to the left
               mid = partitionStableTuples<cclTupleIds::Pn>(mid, end);
 
+              timer2.end_section("Stable partitons placed aside");
+
               if(OPTIMIZATION == opt_level::loadbalanced)
               {
                 mid = mxx::block_decompose_partitions(begin, mid, end, comm);
                 //Re distributed the tuples to balance the load across the ranks
+              
+                timer2.end_section("Load balanced");
               }
             }
             distance_begin_mid = std::distance(begin, mid);
@@ -236,9 +250,9 @@ namespace conn
             iterCount ++;
           }
 
-          timer.end_section("Coloring done");
+          timer.end_section("Total time consumed during coloring");
 
-          LOG_IF(comm.rank() == 0, INFO) << "Iteration count " << iterCount;
+          LOG_IF(comm.rank() == 0, INFO) << "Algorithm took " << iterCount << " iterations";
         }
 
         /**
