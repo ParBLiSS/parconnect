@@ -34,10 +34,10 @@ namespace conn
      * @class                     conn::coloring::ccl
      * @brief                     supports parallel connected component labeling using label propagation technique
      * @tparam[in]  nIdType       type used for node id
-     * @tparam[in]  OPTIMIZATION  optimization level for benchmarking, use loadbalanced for the best version 
      * @tparam[in]  DOUBLING      controls whether pointer doubling would be executed or not, 'ON' by default.
+     * @tparam[in]  OPTIMIZATION  optimization level for benchmarking, use loadbalanced for the best version 
      */
-    template<typename nIdType = uint64_t, uint8_t OPTIMIZATION = opt_level::loadbalanced, uint8_t DOUBLING = lever::ON>
+    template<typename nIdType = uint64_t, uint8_t DOUBLING = lever::ON, uint8_t OPTIMIZATION = opt_level::loadbalanced>
     class ccl 
     {
       public:
@@ -227,9 +227,10 @@ namespace conn
               //Due to insertion and deletion of elements, block decomposed property is lost during 
               //the pointer doubling, so redo it
               mxx::distribute_inplace(tupleVector, comm);
+
+              timer2.end_section("\tPointer doubling done");
             }
 
-            timer2.end_section("\tPointer doubling done");
 
             //IMPORTANT : iterators over tupleVector are invalid and need to be redefined
             //Why? Because vector could undergo reallocation during pointer doubling
