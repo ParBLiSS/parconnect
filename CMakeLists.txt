@@ -15,6 +15,13 @@ if(UNIX)
   set(CMAKE_LIBRARY_PATH "${CMAKE_LIBRARY_PATH} /lib /usr/lib")
 endif()
 
+#Set default cmake build type
+IF(NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
+    "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+    FORCE)
+ENDIF(NOT CMAKE_BUILD_TYPE)
+
 
 if(COMMAND cmake_policy)
   cmake_policy(SET CMP0003 NEW)
