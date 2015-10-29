@@ -19,6 +19,9 @@ target_link_libraries(time_ccl_coloring_undirected_graph500_wo_doubling ${EXTRA_
 add_executable(time_ccl_coloring_undirected_chains time_ccl_coloring_undirected_chains.cpp)
 target_link_libraries(time_ccl_coloring_undirected_chains ${EXTRA_LIBS})
 
+add_executable(time_ccl_coloring_undirected_chains_wo_doubling time_ccl_coloring_undirected_chains_wo_doubling.cpp)
+target_link_libraries(time_ccl_coloring_undirected_chains_wo_doubling ${EXTRA_LIBS})
+
 #################
 ## CORRECTNESS ##
 #################

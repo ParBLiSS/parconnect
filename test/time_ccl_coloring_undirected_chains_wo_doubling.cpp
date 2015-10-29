@@ -1,19 +1,17 @@
 /**
- * @file    time_ccl_coloring_undirected_graph500_wo_doubling.cpp
+ * @file    time_ccl_coloring_undirected_chains_wo_doubling.cpp
  * @ingroup group
  * @author  Chirag Jain <cjain7@gatech.edu>
- * @brief   Computes connected components in the synthetic undirected kronecker graph
- *          without pointer doubling
+ * @brief   Checks the performance of coloring approach on undirected chain graphs
  *
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
-
 //Includes
 #include <mpi.h>
 #include <iostream>
 
 //Own includes
-#include "graphGen/graph500/graph500Gen.hpp"
+#include "graphGen/undirectedChain/undirectedChainGen.hpp"
 #include "coloring/labelProp.hpp"
 #include "utils/logging.hpp"
 #include "utils/argvparser.hpp"
@@ -33,20 +31,20 @@ int main(int argc, char** argv)
   //Initialize the communicator
   mxx::comm comm;
 
-
   //Print mpi rank distribution
   mxx::print_node_distribution();
 
-  LOG_IF(!comm.rank(), INFO) << "Code computes connected components using coloring in the undirected synthetic graph";
+
+  LOG_IF(!comm.rank(), INFO) << "Code computes connected components using coloring on the chain of given length";
 
   //Parse command line arguments
   ArgvParser cmd;
 
-  cmd.setIntroductoryDescription("Computes connected components using coloring in the undirected synthetic graph");
+  cmd.setIntroductoryDescription("Code computes connected components using coloring on the chain of given length");
   cmd.setHelpOption("h", "help", "Print this help page");
 
-  cmd.defineOption("scale", "scale of the graph", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
-  cmd.defineOption("edgefactor", "edgefactor of the graph", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("length", "length of the chain (# nodes)", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+
 
   int result = cmd.parse(argc, argv);
 
@@ -58,30 +56,32 @@ int main(int argc, char** argv)
   }
 
   //Graph params
-  uint8_t scale = std::stoi(cmd.optionValue("scale"));
-  uint8_t edgefactor = std::stoi(cmd.optionValue("edgefactor"));
+  std::size_t length = std::stoi(cmd.optionValue("length"));
+
+  //Have atleast 1 graph
+  assert(scaleUpSteps > 0);
 
   //Object of the graph500 generator class
-  conn::graphGen::graph500Gen g;
+  conn::graphGen::UndirectedChainGen g;
 
-  //graph500 generator only uses int64_t
-  using nodeIdType = int64_t;
+  using nodeIdType = uint64_t;
 
   //Declare a edgeList vector to save edges
   std::vector< std::pair<nodeIdType, nodeIdType> > edgeList;
 
-  //Populate the edgeList
-  g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED, comm); 
+  //Create the edgeList
+  g.populateEdgeList(edgeList, length, conn::graphGen::UndirectedChainGen::LOWTOHIGH_IDS, comm); 
 
-  //Sum up the edge count across ranks
-  auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
-  LOG_IF(!comm.rank(), INFO) << "Total edge count is " << totalEdgeCount;
+  LOG_IF(!comm.rank(), INFO) << "Chain size " << length;
 
-  //Compute connected components
-  //Turn off the pointer doubling
+  //Perform the coloring
+  //Turn the pointer doubling off
   conn::coloring::ccl<nodeIdType, conn::coloring::lever::OFF> cclInstance(edgeList, comm);
   cclInstance.compute();
+
 
   MPI_Finalize();
   return(0);
 }
+
+

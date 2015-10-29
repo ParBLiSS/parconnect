@@ -35,17 +35,15 @@ int main(int argc, char** argv)
   mxx::print_node_distribution();
 
 
-  LOG_IF(!comm.rank(), INFO) << "Code computes connected components using coloring on the chains of different lengths";
+  LOG_IF(!comm.rank(), INFO) << "Code computes connected components using coloring on the chain of given length";
 
   //Parse command line arguments
   ArgvParser cmd;
 
-  cmd.setIntroductoryDescription("Code computes connected components using coloring on the chains of different lengths");
+  cmd.setIntroductoryDescription("Code computes connected components using coloring on the chain of given length");
   cmd.setHelpOption("h", "help", "Print this help page");
 
-  cmd.defineOption("startLength", "length of the smallest chain to run on", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
-  cmd.defineOption("scaleFactor", "chain length is increased by this factor", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
-  cmd.defineOption("scaleUpSteps", "Number of times you wish to scale up the graph size, > 0", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("length", "length of the chain (# nodes)", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
 
 
   int result = cmd.parse(argc, argv);
@@ -58,9 +56,7 @@ int main(int argc, char** argv)
   }
 
   //Graph params
-  std::size_t startLength = std::stoi(cmd.optionValue("startLength"));
-  uint8_t scaleFactor = std::stoi(cmd.optionValue("scaleFactor"));
-  uint8_t scaleUpSteps = std::stoi(cmd.optionValue("scaleUpSteps"));
+  std::size_t length = std::stoi(cmd.optionValue("length"));
 
   //Have atleast 1 graph
   assert(scaleUpSteps > 0);
@@ -70,24 +66,17 @@ int main(int argc, char** argv)
 
   using nodeIdType = uint64_t;
 
-  std::size_t graphSize = startLength;
-  for(int i = 0; i < scaleUpSteps; i++)
-  {
-    //Declare a edgeList vector to save edges
-    std::vector< std::pair<nodeIdType, nodeIdType> > edgeList;
+  //Declare a edgeList vector to save edges
+  std::vector< std::pair<nodeIdType, nodeIdType> > edgeList;
 
-    //Create the edgeList
-    g.populateEdgeList(edgeList, graphSize, conn::graphGen::UndirectedChainGen::LOWTOHIGH_IDS, comm); 
+  //Create the edgeList
+  g.populateEdgeList(edgeList, length, conn::graphGen::UndirectedChainGen::LOWTOHIGH_IDS, comm); 
 
-    LOG_IF(!comm.rank(), INFO) << "Chain size " << graphSize;
+  LOG_IF(!comm.rank(), INFO) << "Chain size " << length;
 
-    //Perform the coloring
-    conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
-    cclInstance.compute();
-
-    //Increase the graph size (or chain length)
-    graphSize *= scaleFactor;
-  }
+  //Perform the coloring
+  conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
+  cclInstance.compute();
 
 
   MPI_Finalize();
