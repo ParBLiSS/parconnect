@@ -221,7 +221,13 @@ namespace conn
 
             //Perform pointer doubling if enabled
             if(DOUBLING)
+            {
               doPointerDoubling(distance_begin_mid, parentRequestTupleVector);
+
+              //Due to insertion and deletion of elements, block decomposed property is lost during 
+              //the pointer doubling, so redo it
+              mxx::distribute_inplace(tupleVector, comm);
+            }
 
             timer2.end_section("\tPointer doubling done");
 
