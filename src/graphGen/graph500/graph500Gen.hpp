@@ -16,7 +16,7 @@
 #include <vector>
 
 //Own includes
-#include "graphGen/graph500/include/make_graph.h"
+#include "graph500-gen/make_graph.h"
 #include "mxx/timer.hpp"
 
 namespace conn 
