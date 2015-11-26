@@ -22,6 +22,9 @@ target_link_libraries(time_ccl_coloring_undirected_chains ${EXTRA_LIBS})
 add_executable(time_ccl_coloring_undirected_chains_wo_doubling time_ccl_coloring_undirected_chains_wo_doubling.cpp)
 target_link_libraries(time_ccl_coloring_undirected_chains_wo_doubling ${EXTRA_LIBS})
 
+add_executable(time_single_bfs_run time_single_bfs_run.cpp)
+target_link_libraries(time_single_bfs_run ${EXTRA_LIBS} MPITypelib CommGridlib)
+
 #################
 ## CORRECTNESS ##
 #################

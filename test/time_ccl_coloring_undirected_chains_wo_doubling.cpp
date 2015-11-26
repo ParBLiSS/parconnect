@@ -58,9 +58,6 @@ int main(int argc, char** argv)
   //Graph params
   std::size_t length = std::stoi(cmd.optionValue("length"));
 
-  //Have atleast 1 graph
-  assert(scaleUpSteps > 0);
-
   //Object of the graph500 generator class
   conn::graphGen::UndirectedChainGen g;
 

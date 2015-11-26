@@ -41,9 +41,13 @@ endif (MPI_FOUND)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib CACHE PATH "Output directory for libraries" )
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH "Output directory for applications" )
 
+# compile CombBLAS
+add_subdirectory("${PROJECT_SOURCE_DIR}/ext/CombBLAS")
+
 # include external repo : mxx, graph500-gen
 include_directories("${PROJECT_SOURCE_DIR}/ext/mxx/include")
 include_directories("${PROJECT_SOURCE_DIR}/ext")
+
 
 # include src files
 include_directories("${PROJECT_SOURCE_DIR}/src")
