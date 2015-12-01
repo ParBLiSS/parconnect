@@ -31,3 +31,6 @@ target_link_libraries(time_single_bfs_run ${EXTRA_LIBS} MPITypelib CommGridlib)
 
 add_executable(test-coloring test_ccl_coloring.cpp)
 target_link_libraries(test-coloring mxx-gtest-main)
+
+add_executable(test-graphgen test_graphgen.cpp)
+target_link_libraries(test-graphgen mxx-gtest-main)

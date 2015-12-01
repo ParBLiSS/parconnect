@@ -32,7 +32,9 @@ namespace conn
       public:
 
         static const uint8_t LOWTOHIGH_IDS = 0;
-        static const uint8_t RANDOM_IDS = 1;
+
+        //TODO: Low Priority task, enable chain construction with random ids
+        //static const uint8_t RANDOM_IDS = 1;
         
         /**
          * @brief                 populates the edge list vector 
@@ -51,7 +53,7 @@ namespace conn
           mxx::section_timer timer;
 
           //sanity check
-          assert(mode == LOWTOHIGH_IDS || mode == RANDOM_IDS);
+          assert(mode == LOWTOHIGH_IDS);
 
           //Know the portion of graph to be generated locally 
           //Lets divide the chainLength value by the number of processes
@@ -59,7 +61,7 @@ namespace conn
 
           if(mode == LOWTOHIGH_IDS)
           {
-            //First node id on this node
+            //First node (vertex) id on this MPI node
             T beginNodeId = part.excl_prefix_size(); 
             T lastNodeId = part.excl_prefix_size() + part.local_size() -1 ;
 

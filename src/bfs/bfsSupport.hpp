@@ -19,10 +19,10 @@
 void runBFSTrial(int scale, int edgefactor, mxx::comm &comm)
 {
   //Matrix type, to store the adjacency matrix (bool values)
-	typedef SpParMat < int64_t, bool, SpDCCols<int64_t,bool> > MatTypeForBool;
+  typedef SpParMat < int64_t, bool, SpDCCols<int64_t,bool> > MatTypeForBool;
 
   //Matrix type, to store the adjacency matrix (int values)
-	typedef SpParMat < int64_t, int64_t, SpDCCols<int64_t,int64_t> > MatTypeForInt;
+  typedef SpParMat < int64_t, int64_t, SpDCCols<int64_t,int64_t> > MatTypeForInt;
 
   // degrees of vertices (including multi-edges and self-loops)
   FullyDistVec<int64_t, int64_t> degrees;	

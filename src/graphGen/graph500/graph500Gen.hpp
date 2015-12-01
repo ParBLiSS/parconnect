@@ -52,7 +52,7 @@ namespace conn
             uint8_t scale, 
             uint8_t edgeFactor, 
             uint8_t mode,
-            const mxx::comm &comm = mxx::comm())
+            const mxx::comm &comm)
         {
           //seeds to use
           int64_t seeds[2] = {1,2};
