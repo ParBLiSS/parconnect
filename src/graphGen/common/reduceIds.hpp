@@ -103,7 +103,7 @@ namespace conn
 
     /**
      * @brief                         Given a graph as list of edges, it updates all the vertex ids so
-     *                                that they are contiguos from 1 to |V|
+     *                                that they are contiguos from 0 to |V-1|
      * @param[in]  edgeList           distributed vector of edges
      * @param[out] uniqueVertexList   distributed array of original vertex ids (global index of vertex here is its new id)
      * @details                       Implemented using bucketing and all2all communication
@@ -174,7 +174,7 @@ namespace conn
             auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, cmp); 
 
             //Id that it should be assigned
-            auto trueId = exScanCountOfVertices + std::distance(uniqueVertexList.begin(), it) + 1;
+            auto trueId = exScanCountOfVertices + std::distance(uniqueVertexList.begin(), it);
 
             std::for_each(edgeListRange.first, edgeListRange.second, [&](std::pair<E,E> &e){
                 std::get<SRC>(e) = trueId;
@@ -202,7 +202,7 @@ namespace conn
             auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, cmp); 
 
             //Id that it should be assigned
-            auto trueId = exScanCountOfVertices + std::distance(uniqueVertexList.begin(), it) + 1;
+            auto trueId = exScanCountOfVertices + std::distance(uniqueVertexList.begin(), it);
 
             std::for_each(edgeListRange.first, edgeListRange.second, [&](std::pair<E,E> &e){
                 std::get<DEST>(e) = trueId;

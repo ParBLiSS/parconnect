@@ -90,13 +90,15 @@ public:
 	void GenGraph500Data(double initiator[4], int log_numverts, int edgefactor, bool scramble =false, bool packed=false);
 
   /**
-   * Generating graph using copy of already existing edgelist
+   * @brief                 Generating graph using the already existing edgelist
+   * @param[in] numverts    Count of vertices in the graph
+   * @param[in] edgelist    vector of edges
    */
   template <typename EdgeListType>  //Vector of tuples
-    void GenGraph500Data(const EdgeListType &edgeList, int log_numverts)
+    void GenGraphData(const EdgeListType &edgeList, int numverts)
     {
       //Set count of vertices
-      globalV = ((int64_t)1)<< log_numverts;
+      globalV = numverts;
 
       //Count of edges local to this rank
       nedges = edgeList.size();

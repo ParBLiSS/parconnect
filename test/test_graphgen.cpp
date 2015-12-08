@@ -27,9 +27,9 @@ TEST(graphGen, reduceIdSmallGraph) {
 
   mxx::comm c = mxx::comm();
 
-  std::vector< std::pair<int64_t, int64_t> > edgeList;
-
   using nodeIdType = int64_t;
+
+  std::vector< std::pair<nodeIdType, nodeIdType> > edgeList;
 
   //Start adding the edges
   //Example : For 4 processes, offsets will be 400, 300, 200, 100
@@ -52,9 +52,6 @@ TEST(graphGen, reduceIdSmallGraph) {
 
   //Call the function
   conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, c);
-
-  std::cout << c.rank() << "-- " << edgeList << std::endl;
-  std::cout << c.rank() << "-- " << uniqueVertexList << std::endl;
 
   //Total size of uniqueVertexList
   auto globalSizeUnique = conn::graphGen::globalSizeOfVector(uniqueVertexList, c);

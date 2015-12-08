@@ -1301,6 +1301,9 @@ void SpParMat<IT,NT,DER>::OptimizeForGraph500(OptBuf<LIT,OT> & optbuf)
 			{
 				typename DER::LocalIT owner = min(nzit.rowid() / perproc, p_c-1); 			
 				maxlens[owner]++;
+
+        assert(rowid < mA);
+
 				isthere[rowid] = true;
 			}
 		}

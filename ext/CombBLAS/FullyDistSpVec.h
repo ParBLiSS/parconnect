@@ -32,6 +32,7 @@ THE SOFTWARE.
 #include <iostream>
 #include <vector>
 #include <utility>
+#include <unordered_set>
 #include "CommGrid.h"
 #include "promote.h"
 #include "SpParMat.h"
@@ -135,6 +136,19 @@ public:
 	FullyDistVec<IT,NT> operator() (const FullyDistVec<IT,IT> & ri) const;	//!< SpRef (expects ri to be 0-based)
 	void SetElement (IT indx, NT numx);	// element-wise assignment
 	void DelElement (IT indx); // element-wise deletion
+
+  /**
+   * @brief       Remove elements in index from the set
+   */
+  template <typename E>
+    void removeFromHash(std::unordered_set<E> &localUnvisitedVertices)
+    {
+      for(auto e: ind)
+      {
+        localUnvisitedVertices.erase(e);
+      }
+    }
+
 	NT operator[](IT indx);
 	bool WasFound() const { return wasFound; }
 

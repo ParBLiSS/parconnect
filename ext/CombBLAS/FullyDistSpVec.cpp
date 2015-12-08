@@ -853,3 +853,5 @@ void FullyDistSpVec<IT,NT>::BulkSet(IT inds[], int count) {
 	copy(inds, inds+count, ind.data());
 	copy(inds, inds+count, num.data());
 }
+
+
