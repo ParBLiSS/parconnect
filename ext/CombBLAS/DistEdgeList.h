@@ -100,14 +100,17 @@ public:
       //Set count of vertices
       globalV = numverts;
 
+      //DEBUGGING
       //Count of edges local to this rank
       nedges = edgeList.size();
 
       SetMemSize(nedges);	
 
-      // clear the source vertex by setting it to -1
+      uint64_t rank = (uint64_t) commGrid->GetRank();
+
       for (IT i = 0; i < edgeList.size(); i++)
       {
+        //std::cout << "Rank " << rank  << edgeList[i] << std::endl;
         edges[2*i + 0] = edgeList[i].first;
         edges[2*i + 1] = edgeList[i].second;
       }
@@ -143,7 +146,6 @@ private:
 
 template<typename IU>
 void PermEdges(DistEdgeList<IU> & DEL);
-
 
 #include "DistEdgeList.cpp"
 

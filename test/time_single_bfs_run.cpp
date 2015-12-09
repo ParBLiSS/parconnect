@@ -15,6 +15,8 @@
 #include "graphGen/graph500/graph500Gen.hpp"
 #include "graphGen/common/reduceIds.hpp"
 #include "bfs/bfsRunner.hpp"
+#include "bfs/bfsFunctionOnGraph500.hpp"
+#include "bfs/bfsFunctionOnEdgeList.hpp"
 
 #include "utils/logging.hpp"
 #include "utils/prettyprint.hpp"
@@ -99,23 +101,30 @@ int main(int argc, char** argv)
   //Count of edges in the graph
   std::size_t nEdges = conn::graphGen::globalSizeOfVector(edgeList, comm);
 
-  LOG_IF(!comm.rank(), INFO) << "Graph size : vertices(" << nVertices << "), edges [x2 during undirected mode](" << nEdges << ")";
+  //LOG_IF(!comm.rank(), INFO) << "Graph size : vertices(" << nVertices << "), edges [x2 during undirected mode](" << nEdges << ")";
 
   /**
    * RUN BFS
    */
 
   //For saving the size of component discovered using BFS
-  std::vector<std::size_t> componentCountsResult;
+  //std::vector<std::size_t> componentCountsResult;
 
-  {
-    conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
+  /*{*/
+    //conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
 
-    //Run BFS once
-    bfsInstance.runBFSIterations(1, componentCountsResult); 
-  }
+    ////Run BFS once
+    //bfsInstance.runBFSIterations(1, componentCountsResult); 
+  /*}*/
 
-  LOG_IF(!comm.rank(), INFO) << "Component size traversed :" << componentCountsResult[0];
+  //BFS run on graph with inbuilt kronecker genarator
+  bfsComponentFinder(scale);
+
+  //BFS run on our edgeList generated above
+  bfsComponentFinder2(edgeList, nVertices);
+
+
+  //LOG_IF(!comm.rank(), INFO) << "Component size traversed :" << componentCountsResult[0];
 
   MPI_Finalize();
   return(0);

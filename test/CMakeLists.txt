@@ -35,5 +35,5 @@ target_link_libraries(test-coloring mxx-gtest-main)
 add_executable(test-graphgen test_graphgen.cpp)
 target_link_libraries(test-graphgen mxx-gtest-main)
 
-add_executable(test-bfsRunner test_bfsRunner.cpp)
-target_link_libraries(test-bfsRunner mxx-gtest-main MPITypelib CommGridlib)
+#add_executable(test-bfsRunner test_bfsRunner.cpp)
+#target_link_libraries(test-bfsRunner mxx-gtest-main MPITypelib CommGridlib)

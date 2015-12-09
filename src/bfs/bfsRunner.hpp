@@ -25,7 +25,6 @@ namespace conn
 {
   namespace bfs
   {
-
     /**
      * @class                     conn::bfs::bfsSupport
      * @brief                     supports parallel connected component labeling using BFS iterations

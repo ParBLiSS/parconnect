@@ -265,6 +265,7 @@ void DistEdgeList<IT>::GenGraph500Data(double initiator[4], int log_numverts, in
 		{
 			for(IT i=0; i < nedges; ++i)
 			{
+        //std::cout << "Rank " << rank  << "[" << edges[2*i + 0] << ", " << edges[2*i + 1] << "]" << std::endl;
 				edges[2*i+0] = RefGen21::scramble(edges[2*i+0], log_numverts, val0, val1);
 				edges[2*i+1] = RefGen21::scramble(edges[2*i+1], log_numverts, val0, val1);
 			}
