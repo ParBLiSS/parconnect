@@ -9,7 +9,7 @@ The repository and external submodules can be cloned directly:
     git clone --recursive <GITHUB_URL>
     mkdir build_directory && cd build_directory
     cmake ../parconnect
-    make 
+    make -j4
 
 ### Run ###
 
