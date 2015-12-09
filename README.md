@@ -8,8 +8,8 @@ The repository and external submodules can be cloned directly:
 
     git clone --recursive <GITHUB_URL>
     mkdir build_directory && cd build_directory
-    cmake ../parConnect
-    make 
+    cmake ../parconnect
+    make -j4
 
 ### Run ###
 
@@ -25,5 +25,4 @@ Inside the build directory,
 - Design algorithm to compute connected components in undirected graphs or weakly connected components in directed graphs. 
 - Algorithm should be a mix of BFS and coloring approach.
 - Algorithm should perform best on different graph topologies and not just scale-free graphs.
-- Compare against boost connectivity algorithm, GraphLab, parallel BFS, coloring. 
-
+- Compare against boost connectivity algorithm, GraphLab, parallel BFS, coloring.
