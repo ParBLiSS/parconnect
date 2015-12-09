@@ -110,7 +110,10 @@ public:
 
       for (IT i = 0; i < edgeList.size(); i++)
       {
-        //std::cout << "Rank " << rank  << edgeList[i] << std::endl;
+        //Each edge vertex id should be less than the given vertex count
+        assert(edgeList[i].first < numverts);
+        assert(edgeList[i].second < numverts);
+
         edges[2*i + 0] = edgeList[i].first;
         edges[2*i + 1] = edgeList[i].second;
       }

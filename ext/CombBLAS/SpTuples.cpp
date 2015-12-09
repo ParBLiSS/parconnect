@@ -1,4 +1,3 @@
-/****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
 /* version 1.1 -------------------------------------------------*/
 /* date: 12/25/2010 --------------------------------------------*/
@@ -95,7 +94,10 @@ SpTuples<IT,NT>::SpTuples (int64_t maxnnz, IT nRow, IT nCol, vector<IT> & edges,
 		}
 	}
 	assert(j == nnz);
-	delete [] tuples;
+
+  if(maxnnz > 0)      //The memory was allocated if maxnnz > 0
+    delete [] tuples;
+
 	tuples = ntuples;
 }
 

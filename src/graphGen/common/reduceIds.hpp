@@ -138,6 +138,7 @@ namespace conn
         uniqueVertexList.erase(last, uniqueVertexList.end());
 
         mxx::distribute_inplace(uniqueVertexList, comm);
+        mxx::sort(uniqueVertexList.begin(), uniqueVertexList.end(), comm); //Sorting is required after distribute
 
         //Local count of vertices on this rank
         auto localCountOfVertices = uniqueVertexList.size();
