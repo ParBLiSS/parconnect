@@ -341,15 +341,14 @@ FullyDistSpVec<IT,VT>  SpMV (const SpParMat<IT,bool,UDER> & A, const FullyDistSp
 #ifdef TIMING
 	double t2=MPI_Wtime();
 #endif
-	if(optbuf.totmax > 0 )	// graph500 optimization enabled
+  //Commeting this statement below to avoid possibility
+  //of a deadlock in the alltoallv
+
+	//if(optbuf.totmax > 0 )	// graph500 optimization enabled
 	{
-	        MPI_Alltoallv(optbuf.inds, sendcnt, optbuf.dspls, MPIType<int32_t>(), recvindbuf, recvcnt, rdispls, MPIType<int32_t>(), RowWorld);  
+    MPI_Alltoallv(optbuf.inds, sendcnt, optbuf.dspls, MPIType<int32_t>(), recvindbuf, recvcnt, rdispls, MPIType<int32_t>(), RowWorld);  
 		MPI_Alltoallv(optbuf.nums, sendcnt, optbuf.dspls, MPIType<VT>(), recvnumbuf, recvcnt, rdispls, MPIType<VT>(), RowWorld);  
 		delete [] sendcnt;
-	}
-	else
-	{
-		SpParHelper::Print("BFS only (no semiring) function only work with optimization buffers\n");
 	}
 #ifdef TIMING
 	double t3=MPI_Wtime();

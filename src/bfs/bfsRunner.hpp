@@ -80,9 +80,7 @@ namespace conn
           DistEdgeList<E> *DEL = new DistEdgeList<E>();
 
           //Copy our edgeList to CombBLAS format of edgeList
-          //DEL->GenGraphData(edgeList, vertexCount);
-          double initiator[4] =  {.57, .19, .19, .05};
-          DEL->GenGraph500Data(initiator, 12, 16);
+          DEL->GenGraphData(edgeList, vertexCount);
 
           integerMatrixType *G = new integerMatrixType(*DEL, false); 
           delete DEL;	// free memory
@@ -143,6 +141,9 @@ namespace conn
             fringe.SetElement(srcPoint, srcPoint);
             parents.SetElement(srcPoint, srcPoint);
 
+            //Remove the source vertex from our vertex set
+            fringe.removeFromHash(unVisitedVertices);
+
             //Set to 1 as we include the source
             std::size_t trackCountOfVerticesVisited = 1;
 
@@ -177,15 +178,16 @@ namespace conn
         private:
 
         /**
-         * @brief             runs multiple bfs iterations for graph connectivity
-         * @param[in] offset  upper bound on the count of iterations for BFS runs
+         * @brief             returns next source to start the BFS iterations
+         * @param[in] offset  its the value addition required to convert local
+         *                    ids in unVisitedVertices to global vertex ids
          */
         E getSource(E offset)
         {
           //get candidate from this rank
           E firstLocalElement;
 
-          if(unVisitedVertices.begin() == unVisitedVertices.end())
+          if(unVisitedVertices.empty())
           {
             //Set to MAX if the map is empty
             firstLocalElement = MAX;
