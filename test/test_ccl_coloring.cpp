@@ -99,7 +99,7 @@ TEST(connColoring, smallUndirected) {
     edgeList.emplace_back(6,8);
     edgeList.emplace_back(8,6);
 
-    //Third component (chain 50-51-...1000)
+    //Third component (50,51,52)
     for(int i = 50; i < 52 ; i++)
     {
       edgeList.emplace_back(i, i+1);

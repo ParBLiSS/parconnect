@@ -44,6 +44,7 @@ TEST(graphGen, reduceIdSmallGraph) {
     edgeList.emplace_back(6*i + offset, 3*i + offset);
   }
 
+  //We have added 8 unique vertices on each rank
   std::size_t totalUniqueVerticesGlobal = 8 * c.size();
 
   std::random_shuffle(edgeList.begin(), edgeList.end());
@@ -54,10 +55,11 @@ TEST(graphGen, reduceIdSmallGraph) {
   //Call the function
   conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, c);
 
-  //Total size of uniqueVertexList
+  //Total size of uniqueVertexList or the count of unique vertices in the whole graph
   auto globalSizeUnique = conn::graphGen::globalSizeOfVector(uniqueVertexList, c);
 
-  //Each rank should contain following edge
+  //Each rank should contain following edge like (0,1) on proc 0 and (8, 9) on proc 1
+  //This is assuming the edges were sorted during the reduction
   auto edge = std::make_pair((nodeIdType)0 + 8*c.rank(), (nodeIdType)1 + 8*c.rank());
 
   //Edge should exist on this rank
