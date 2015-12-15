@@ -33,9 +33,6 @@ namespace conn
         //edge id is restricted to type int64_t in the c code, so we use the same 
         using T = int64_t; 
         
-        static const uint8_t DIRECTED = 0;
-        static const uint8_t UNDIRECTED = 1;
-
       private:
         static const double initiator[4];
 
@@ -44,14 +41,15 @@ namespace conn
         /**
          * @brief                 populates the edge list vector 
          * @param[out] edgeList   input vector to fill up
-         * @param[in] mode        choose between DIRECTED or UNDIRECTED
          * @param[in] scale       scale of the graph
          * @param[in] edgeFactor  edgeFactor of the graph
+         * @details               Each edge generated using kronecker generator is 
+         *                        replicated both side ways (u--v, v--u) in 
+         *                        the edgeList
          */
         void populateEdgeList( std::vector< std::pair<int64_t, int64_t> > &edgeList, 
             uint8_t scale, 
             uint8_t edgeFactor, 
-            uint8_t mode,
             const mxx::comm &comm)
         {
           //seeds to use
@@ -68,9 +66,6 @@ namespace conn
           //Use the internal function to populate the edges
           make_graph(scale, desired_nedges, seeds[0], seeds[1], initiator, &nedges, &edges);
 
-          //sanity check
-          assert(mode == DIRECTED || mode == UNDIRECTED);
-
           for (int i = 0; i < nedges; ++i) 
           {
             T src = edges[2*i];
@@ -82,8 +77,7 @@ namespace conn
               edgeList.emplace_back(src, dest);
 
               //Insert the reverse edge if the mode is undirected
-              if(mode == UNDIRECTED)
-                edgeList.emplace_back(dest, src);
+              edgeList.emplace_back(dest, src);
             }
           }
 

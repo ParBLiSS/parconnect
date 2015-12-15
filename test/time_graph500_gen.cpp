@@ -64,7 +64,7 @@ int main(int argc, char** argv)
   std::vector< std::pair<int64_t, int64_t> > edgeList;
 
   //Populate the edgeList
-  g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED, comm); 
+  g.populateEdgeList(edgeList, scale, edgefactor, comm); 
 
   //Sum up the edge count across ranks
   auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);

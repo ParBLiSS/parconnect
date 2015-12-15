@@ -92,7 +92,7 @@ TEST(graphGen, reduceIdgraph500) {
     int scale = 11, edgefactor = 16;
 
     //Populate the edgeList (scale = 10, edgefactor = 16, Undirected for adding edges both ways)
-    g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED, c); 
+    g.populateEdgeList(edgeList, scale, edgefactor, c); 
 
     //Initialize the distributed vector for saving unique vertices
     std::vector<nodeIdType> uniqueVertexList;

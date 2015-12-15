@@ -1,9 +1,8 @@
 /**
- * @file    time_ccl_coloring_undirected_graph500_wo_doubling.cpp
+ * @file    time_ccl_coloring_undirected_graph500.cpp
  * @ingroup group
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Computes connected components in the synthetic undirected kronecker graph
- *          without pointer doubling
  *
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
@@ -71,15 +70,14 @@ int main(int argc, char** argv)
   std::vector< std::pair<nodeIdType, nodeIdType> > edgeList;
 
   //Populate the edgeList
-  g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED, comm); 
+  g.populateEdgeList(edgeList, scale, edgefactor, comm); 
 
   //Sum up the edge count across ranks
   auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
   LOG_IF(!comm.rank(), INFO) << "Total edge count is " << totalEdgeCount;
 
   //Compute connected components
-  //Turn off the pointer doubling
-  conn::coloring::ccl<nodeIdType, conn::coloring::lever::OFF> cclInstance(edgeList, comm);
+  conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
   cclInstance.compute();
 
   MPI_Finalize();

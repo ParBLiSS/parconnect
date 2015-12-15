@@ -87,7 +87,7 @@ int main(int argc, char** argv)
     conn::graphGen::graph500Gen g;
 
     //Populate the edgeList, using undirected mode that includes the edge and its reverse
-    g.populateEdgeList(edgeList, scale, edgefactor, conn::graphGen::graph500Gen::UNDIRECTED, comm); 
+    g.populateEdgeList(edgeList, scale, edgefactor, comm); 
 
     //Call the graph reducer function
     conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
