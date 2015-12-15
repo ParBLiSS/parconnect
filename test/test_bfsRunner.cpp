@@ -58,10 +58,19 @@ TEST(bfsRunCheck, multipleUndirectedChainsSingleRun) {
     //Check the values of the vector returned
     bool check2 = std::equal(componentCountsResult.begin(), componentCountsResult.end(), componentCountsExpected.begin());
 
+    //Remove the edges associated with the visited components
+    bfsInstance.filterEdgeList();
+
+    //Each component has (50-1)*2 edges, this implies we should 
+    //be left with 98*(p-1) edges in total after exectuting bfs above
+    auto leftEdgesCount = conn::graphGen::globalSizeOfVector(edgeList, comm);
+
     ASSERT_EQ(check1, true); 
     ASSERT_EQ(check2, true);
+    ASSERT_EQ(leftEdgesCount, 98*(comm.size() - 1));
   }
 }
+
 
 /**
  * @brief     Each rank initializes a chain graph of length 50, 
@@ -104,10 +113,14 @@ TEST(bfsRunCheck, multipleUndirectedChainsMultipleRuns) {
     //Check the values of the vector returned
     bool check2 = std::equal(componentCountsResult.begin(), componentCountsResult.end(), componentCountsExpected.begin());
 
+    //Remove the edges associated with the visited components
+    bfsInstance.filterEdgeList();
+
+    //We should be left with no edges after exectuting bfs above
+    auto leftEdgesCount = conn::graphGen::globalSizeOfVector(edgeList, comm);
+
     ASSERT_EQ(check1, true); 
     ASSERT_EQ(check2, true);
+    ASSERT_EQ(leftEdgesCount, 0);
   }
-
 }
-
-

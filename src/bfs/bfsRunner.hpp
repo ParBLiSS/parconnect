@@ -18,7 +18,9 @@
 #include "graph500-gen/make_graph.h"
 #include "CombBLAS/CombBLAS.h"
 #include "utils/logging.hpp"
+#include "graphGen/common/reduceIds.hpp"
 #include "mxx/comm.hpp"
+#include "mxx/distribution.hpp"
 
 
 namespace conn 
@@ -33,35 +35,40 @@ namespace conn
     template <typename vertexIdType>
       class bfsSupport
       {
-        //BFS implementation uses signed integer types
-        using E = typename std::make_signed<vertexIdType>::type;
+        private:
 
-        //Distributed set of unvisited vertices
-        std::unordered_set<E> unVisitedVertices;
+          //BFS implementation uses signed integer types
+          using E = typename std::make_signed<vertexIdType>::type;
 
-        //Reference to the distributed edge list 
-        std::vector< std::pair<E,E> > &edgeList;
+          //Distributed set of unvisited vertices
+          std::unordered_set<E> unVisitedVertices;
 
-        //Matrix type, to store the adjacency matrix (bool values)
-        //from combBLAS implementation 
-        using booleanMatrixType = SpParMat <E, bool, SpDCCols<E ,bool> >;
+          //Reference to the distributed edge list 
+          std::vector< std::pair<E,E> > &edgeList;
 
-        //Matrix type, to store the adjacency matrix (int values)
-        //from combBLAS implementation 
-        using integerMatrixType = SpParMat <E, E, SpDCCols<E, E> >;
+          //Matrix type, to store the adjacency matrix (bool values)
+          //from combBLAS implementation 
+          using booleanMatrixType = SpParMat <E, bool, SpDCCols<E ,bool> >;
 
-        //Optimization buffer (used as a parameter in combBLAS function calls)
-        //TODO: Generalize these types
-        OptBuf<int32_t, int64_t> optbuf;
+          //Matrix type, to store the adjacency matrix (int values)
+          //from combBLAS implementation 
+          using integerMatrixType = SpParMat <E, E, SpDCCols<E, E> >;
 
-        //combBLAS distributed storage for adjacency matrix
-        booleanMatrixType A;
+          //Optimization buffer (used as a parameter in combBLAS function calls)
+          //TODO: Generalize these types
+          OptBuf<int32_t, int64_t> optbuf;
 
-        //This is the communicator which participates for computing the components
-        mxx::comm comm;
+          //combBLAS distributed storage for adjacency matrix
+          booleanMatrixType A;
 
-        //For convenience, define the maximum value 
-        E MAX = std::numeric_limits<E>::max();
+          //This is the communicator which participates for computing the components
+          mxx::comm comm;
+
+          //For convenience, define the maximum value 
+          E MAX = std::numeric_limits<E>::max();
+
+          //Size of the parents array local to this rank
+          std::size_t localDistVecSize;
 
         public:
 
@@ -119,8 +126,11 @@ namespace conn
           //Parent array (acts as a list of vertices in a component for us)
           FullyDistVec<E, E> parents(A.getcommgrid(), A.getncol(), (E) -1);	// numerical values are stored 0-based
 
+          //Record the parents array size
+          localDistVecSize = parents.LocArrSize();
+
           //Exscan of vertex count kept on previous ranks
-          E offsetForLocalToGlobal = mxx::exscan(parents.LocArrSize(), comm);
+          E offsetForLocalToGlobal = mxx::exscan(localDistVecSize, comm);
 
           for(int i = 0; i < noIterations; i++) 
           {
@@ -173,6 +183,68 @@ namespace conn
             MPI_Barrier(comm);
           }
 
+        }
+
+        /**
+         * @brief                             Remove the edges corresponding to vertices which have been 
+         *                                    covered by BFS
+         * @details                           Find the splitters from the unVisitedVertices and split the edges
+         *                                    based on their DEST values 
+         *                                    Do all2all and remove the edges through linear scan
+         * @note                              This function should be called after running the BFS iterations. 
+         */
+        void filterEdgeList()
+        {
+          //Exscan of vertex count kept on previous ranks
+          E offsetForLocalToGlobal = mxx::exscan(localDistVecSize, comm);
+
+          //Copy all the unvisited elements from set to vector 
+          std::vector<E> unVisitedVerticesArray(unVisitedVertices.begin(), unVisitedVertices.end());
+          std::for_each(unVisitedVerticesArray.begin(), unVisitedVerticesArray.end(), [&](E& d){d += offsetForLocalToGlobal;});
+          std::sort(unVisitedVerticesArray.begin(), unVisitedVerticesArray.end());
+
+          //Now each rank contains the globally sorted list of vertices that were not visited during BFS
+
+          //Define the splitters using the exscan value obtained above
+          auto allSplitters = mxx::allgather(offsetForLocalToGlobal);
+          allSplitters.erase(allSplitters.begin());
+
+          //New edgelist  
+          std::vector< std::pair<E,E> > edgeListNew;
+
+          //Push the unexplored edges to edgeListNew
+          {
+            const int SRC = 0, DEST = 1;
+
+            //Initialize functor that assigns bucket id to each edge by its source vertex
+            conn::graphGen::edgeToBucketAssignment<E, DEST>  edgeRankAssigner(allSplitters);
+
+            mxx::all2all_func(edgeList, edgeRankAssigner, comm);
+
+            //Local sort
+            conn::graphGen::edgeComparator<DEST> cmp;
+            std::sort(edgeList.begin(), edgeList.end(), cmp);
+
+            //Start traversal over vertex array
+            auto it2 = edgeList.begin();
+            for(auto it = unVisitedVerticesArray.begin(); it != unVisitedVerticesArray.end(); it++)
+            {
+              //Edges whose DEST element equals the unvisited vertex element
+              auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, cmp); 
+
+              //There ought to be atleast one edge for this vertex
+              assert(std::distance(edgeListRange.first , edgeListRange.second) > 0);
+
+              //Insert these edges to our new edgeList
+              edgeListNew.insert(edgeListNew.end(), edgeListRange.first, edgeListRange.second);
+            }
+          }
+
+          //Replace the content of edgeList with the unvisited edges
+          edgeList.assign(edgeListNew.begin(), edgeListNew.end());
+
+          //Ensure the block decomposition of edgeList
+          mxx::distribute_inplace(edgeList, comm);
         }
 
         private:
