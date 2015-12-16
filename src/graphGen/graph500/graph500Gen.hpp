@@ -1,6 +1,6 @@
 /**
  * @file    graph500Gen.hpp
- * @ingroup group
+ * @ingroup graphGen
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Wrapper around code files for parallel graph500 graph generator.
  *
@@ -16,8 +16,10 @@
 #include <vector>
 
 //Own includes
+#include "graphGen/common/timer.hpp"
+
+//External includes
 #include "graph500-gen/make_graph.h"
-#include "mxx/timer.hpp"
 
 namespace conn 
 {
@@ -61,7 +63,7 @@ namespace conn
 
           T *edges;
 
-          mxx::section_timer timer;
+          Timer timer;
 
           //Use the internal function to populate the edges
           make_graph(scale, desired_nedges, seeds[0], seeds[1], initiator, &nedges, &edges);

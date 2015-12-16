@@ -1,6 +1,6 @@
 /**
- * @file    time_ccl_coloring_undirected_chains.cpp
- * @ingroup group
+ * @file    time_ccl_coloring_chains.cpp
+ * @ingroup 
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Checks the performance of coloring approach on undirected chain graphs
  *
@@ -16,6 +16,7 @@
 #include "utils/logging.hpp"
 #include "utils/argvparser.hpp"
 
+//External includes
 #include "mxx/reduction.hpp"
 #include "mxx/utils.hpp"
 
@@ -71,13 +72,13 @@ int main(int argc, char** argv)
 
   LOG_IF(!comm.rank(), INFO) << "Chain size " << length;
 
-  //Perform the coloring
-  conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
-  cclInstance.compute();
+  {
+    //Perform the coloring
+    conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
+    cclInstance.compute();
+  }
 
 
   MPI_Finalize();
   return(0);
 }
-
-

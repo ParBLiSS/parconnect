@@ -1,6 +1,6 @@
 /**
  * @file    time_graph500_gen.cpp
- * @ingroup group
+ * @ingroup 
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Checks if graph500 graph generater works.
  *
@@ -13,10 +13,12 @@
 
 //Own includes
 #include "graphGen/graph500/graph500Gen.hpp"
-#include "mxx/reduction.hpp"
-#include "mxx/utils.hpp"
 #include "utils/logging.hpp"
 #include "utils/argvparser.hpp"
+
+//External includes
+#include "mxx/reduction.hpp"
+#include "mxx/utils.hpp"
 
 INITIALIZE_EASYLOGGINGPP
 using namespace std;
@@ -42,7 +44,7 @@ int main(int argc, char** argv)
   cmd.setHelpOption("h", "help", "Print this help page");
 
   cmd.defineOption("scale", "scale of the graph", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
-  cmd.defineOption("edgefactor", "edgefactor of the graph", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("edgefactor", "edgefactor of the graph", ArgvParser::OptionRequiresValue);
 
   int result = cmd.parse(argc, argv);
 
@@ -54,8 +56,14 @@ int main(int argc, char** argv)
   }
 
   //Graph params
-  uint8_t scale = std::stoi(cmd.optionValue("scale"));
-  uint8_t edgefactor = std::stoi(cmd.optionValue("edgefactor"));
+  int scale = std::stoi(cmd.optionValue("scale"));
+  LOG_IF(!comm.rank(), INFO) << "scale -> " << scale;
+
+  int edgefactor = 16;
+  if(cmd.foundOption("edgefactor")) {
+    edgefactor = std::stoi(cmd.optionValue("edgefactor"));
+  }
+  LOG_IF(!comm.rank(), INFO) << "Edgefactor -> " << edgefactor;
 
   //Object of the graph500 generator class
   conn::graphGen::graph500Gen g;

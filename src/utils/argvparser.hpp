@@ -1,4 +1,6 @@
 /*
+ *   @ingroup utils
+ *
  *   C++ command line argument parser
  *
  *   Copyright (C) 2005 by

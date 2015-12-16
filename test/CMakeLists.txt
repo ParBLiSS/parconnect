@@ -16,8 +16,11 @@ target_link_libraries(time_ccl_coloring_graph500 ${EXTRA_LIBS})
 add_executable(time_ccl_coloring_chains time_ccl_coloring_chains.cpp)
 target_link_libraries(time_ccl_coloring_chains ${EXTRA_LIBS})
 
-add_executable(time_single_bfs_run time_single_bfs_run.cpp)
-target_link_libraries(time_single_bfs_run ${EXTRA_LIBS} MPITypelib CommGridlib)
+add_executable(time_bfs_graph500 time_bfs_graph500.cpp)
+target_link_libraries(time_bfs_graph500 ${EXTRA_LIBS} MPITypelib CommGridlib)
+
+add_executable(time_bfs_coloring_graph500 time_bfs_coloring_graph500.cpp)
+target_link_libraries(time_bfs_coloring_graph500  ${EXTRA_LIBS} MPITypelib CommGridlib)
 
 #################
 ## CORRECTNESS ##

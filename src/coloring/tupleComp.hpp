@@ -1,6 +1,6 @@
 /**
  * @file    tupleComp.hpp
- * @ingroup group
+ * @ingroup coloring
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Custom tuple comparators
  *

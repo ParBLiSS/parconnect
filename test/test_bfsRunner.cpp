@@ -1,6 +1,6 @@
 /**
  * @file    test_bfsRunner.cpp
- * @ingroup group
+ * @ingroup 
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Checks the correctness of BFS runs 
  *
@@ -11,10 +11,11 @@
 #include <mpi.h>
 
 //Own includes
-#include "gtest.h"
 #include "bfs/bfsRunner.hpp"
 #include "utils/prettyprint.hpp"
 
+//External includes
+#include "gtest.h"
 #include "mxx/utils.hpp"
 
 INITIALIZE_EASYLOGGINGPP

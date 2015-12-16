@@ -1,6 +1,6 @@
 /**
  * @file    reduceIds.hpp
- * @ingroup group
+ * @ingroup graphGen
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Given a graph as list of edges, it reduces the vertex ids so that they are contiguous
  *          This process reduces memory usage if graph is represented as an adjacency matrix later.
@@ -17,12 +17,14 @@
 #include <algorithm>
 
 //Own includes
+#include "utils/commonfuncs.hpp"
+
+//External includes
 #include "mxx/distribution.hpp"
 #include "mxx/timer.hpp"
 #include "mxx/sort.hpp"
 #include "mxx/algos.hpp"
 #include "mxx/utils.hpp"
-#include "utils/commonfuncs.hpp"
 
 namespace conn 
 {

@@ -1,6 +1,6 @@
 /**
  * @file    bfsRunner.hpp
- * @ingroup group
+ * @ingroup bfs
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Finds connected components using a BFS iterations
  *
@@ -15,10 +15,12 @@
 #include <unordered_set>
 
 //Own includes
-#include "graph500-gen/make_graph.h"
-#include "CombBLAS/CombBLAS.h"
 #include "utils/logging.hpp"
 #include "graphGen/common/reduceIds.hpp"
+
+//External includes
+#include "graph500-gen/make_graph.h"
+#include "CombBLAS/CombBLAS.h"
 #include "mxx/comm.hpp"
 #include "mxx/distribution.hpp"
 

@@ -1,6 +1,6 @@
 /**
  * @file    labelProp.hpp
- * @ingroup group
+ * @ingroup coloring
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Connected component labeling using label propagation (or coloring) approach
  *
@@ -16,13 +16,14 @@
 //Own includes
 #include "coloring/tupleComp.hpp"
 #include "coloring/labelProp_utils.hpp"
+#include "coloring/timer.hpp" //Timer switch 
 #include "utils/commonfuncs.hpp"
 #include "utils/logging.hpp"
 #include "utils/prettyprint.hpp"
 
+//external includes
 #include "mxx/sort.hpp"
 #include "mxx_extra/sort.hpp"
-#include "mxx/timer.hpp"
 #include "mxx/comm.hpp"
 
 namespace conn 
@@ -105,9 +106,6 @@ namespace conn
 
           //Save the component count
           computeComponentCount();
-
-          //Free the communicator
-          free_comm();
         }
 
         /**
@@ -140,7 +138,7 @@ namespace conn
         template <typename edgeListPairsType>
         void convertEdgeListforCCL(edgeListPairsType &edgeList)
         {
-          mxx::section_timer timer(std::cerr, comm);
+          Timer timer(std::cerr, comm);
 
           //Sort the edgeList by src id of each edge
           mxx::sort(edgeList.begin(), edgeList.end(), TpleComp<edgeListTIds::src>(), comm); 
@@ -185,8 +183,6 @@ namespace conn
           //counting iterations
           int iterCount = 0;
 
-          mxx::section_timer timer(std::cerr, comm);
-
           //range [tupleVector.begin() -- tupleVector.begin() + distance_begin_mid) marks the set of stable partitions in the vector
           //range [tupleVector.begin() + distance_begin_mid -- tupleVector.end()) denotes the active tuples 
           //Initially all the tuples are active, therefore we set distance_begin_mid to 0
@@ -196,7 +192,7 @@ namespace conn
           {
 
             LOG_IF(comm.rank() == 0, INFO) << "Iteration #" << iterCount + 1;
-            mxx::section_timer timer2(std::cerr, comm);
+            Timer timer(std::cerr, comm);
 
             //Temporary storage for extra tuples needed for doubling
             std::vector<T> parentRequestTupleVector;
@@ -212,12 +208,12 @@ namespace conn
             //Update Pn layer (Explore neighbors of a node and find potential partition candidates
             updatePn(mid, tupleVector.end());
 
-            timer2.end_section("\tPn update done");
+            timer.end_section("\tPn update done");
 
             //Update the Pc layer, choose the best candidate
             converged = updatePc(mid, tupleVector.end(),parentRequestTupleVector);
 
-            timer2.end_section("\tPc update done");
+            timer.end_section("\tPc update done");
 
             //Perform pointer doubling if enabled
             if(DOUBLING)
@@ -228,7 +224,7 @@ namespace conn
               //the pointer doubling, so redo it
               mxx::distribute_inplace(tupleVector, comm);
 
-              timer2.end_section("\tPointer doubling done");
+              timer.end_section("\tPointer doubling done");
             }
 
 
@@ -245,22 +241,20 @@ namespace conn
               //use std::partition to move stable tuples to the left
               mid = partitionStableTuples<cclTupleIds::Pn>(mid, end);
 
-              timer2.end_section("\tStable partitons placed aside");
+              timer.end_section("\tStable partitons placed aside");
 
               if(OPTIMIZATION == opt_level::loadbalanced)
               {
                 mid = mxx::block_decompose_partitions(begin, mid, end, comm);
                 //Re distributed the tuples to balance the load across the ranks
               
-                timer2.end_section("\tLoad balanced");
+                timer.end_section("\tLoad balanced");
               }
             }
             distance_begin_mid = std::distance(begin, mid);
 
             iterCount ++;
           }
-
-          timer.end_section("Total time consumed during coloring");
 
           LOG_IF(comm.rank() == 0, INFO) << "Algorithm took " << iterCount << " iterations";
         }

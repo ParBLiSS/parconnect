@@ -1,6 +1,6 @@
 /**
  * @file    labelProp_utils.hpp
- * @ingroup group
+ * @ingroup coloring
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Utils for labelProp.hpp
  *

@@ -1308,7 +1308,7 @@ void SpParMat<IT,NT,DER>::OptimizeForGraph500(OptBuf<LIT,OT> & optbuf)
 			}
 		}
 	}
-	SpParHelper::Print("Optimization buffers set\n");
+	//SpParHelper::Print("Optimization buffers set\n");
 	optbuf.Set(maxlens,mA);
 }
 

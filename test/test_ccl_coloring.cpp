@@ -1,6 +1,6 @@
 /**
  * @file    check_ccl_coloring_undirected.cpp
- * @ingroup group
+ * @ingroup 
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   GTest Unit Tests for connected component labeling using coloring
  *
@@ -9,7 +9,10 @@
 
 #include <mpi.h>
 
+//Own includes
 #include "coloring/labelProp.hpp"
+
+//External includes
 #include "mxx/comm.hpp"
 #include "gtest.h"
 

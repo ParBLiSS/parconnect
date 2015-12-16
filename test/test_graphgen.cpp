@@ -1,6 +1,6 @@
 /**
  * @file    test_graphgen.cpp
- * @ingroup group
+ * @ingroup 
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   GTest Unit Tests related to the graph generation
  *
@@ -11,13 +11,15 @@
 #include <mpi.h>
 #include <algorithm>
 
+//Own includes
 #include "utils/logging.hpp"
 #include "utils/prettyprint.hpp"
-#include "mxx/comm.hpp"
-#include "gtest.h"
-
 #include "graphGen/common/reduceIds.hpp"
 #include "graphGen/graph500/graph500Gen.hpp"
+
+//External includes
+#include "gtest.h"
+#include "mxx/comm.hpp"
 
 INITIALIZE_EASYLOGGINGPP
 

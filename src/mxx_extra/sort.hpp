@@ -1,12 +1,16 @@
 /**
  * @file    sort.hpp
- * @brief   augments extra functions to mxx 
+ * @ingroup mxx_extra
  * @author  Chirag Jain <cjain7@gatech.edu>
+ * @brief   augments extra functions to mxx 
+ *
+ * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
 
 #ifndef MXX2_SORT_HPP
 #define MXX2_SORT_HPP
 
+//External includes
 #include "mxx/comm_fwd.hpp"
 #include "mxx/samplesort.hpp"
 

@@ -1,6 +1,6 @@
 /**
  * @file    undirectedChainGen.hpp
- * @ingroup group
+ * @ingroup graphGen
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Generates distributed chain graph in parallel
  *
@@ -15,7 +15,7 @@
 #include <iostream>
 #include <vector>
 
-//Own includes
+//External includes
 #include "mxx/timer.hpp"
 #include "mxx/partition.hpp"
 
@@ -88,8 +88,5 @@ namespace conn
     };
   }
 }
-
-
-
 
 #endif

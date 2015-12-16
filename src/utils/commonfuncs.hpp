@@ -1,6 +1,6 @@
 /**
  * @file    commonfuncs.hpp
- * @ingroup group
+ * @ingroup utils
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Common utility functions
  *

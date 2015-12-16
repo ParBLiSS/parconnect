@@ -1,8 +1,8 @@
 /**
- * @file    time_single_bfs_run.cpp
- * @ingroup group
+ * @file    time_bfs_graph500.cpp
+ * @ingroup 
  * @author  Chirag Jain <cjain7@gatech.edu>
- * @brief   Single bfs run on kroncker graph
+ * @brief   BFS iterations on kroncker graph
  *
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
@@ -15,11 +15,11 @@
 #include "graphGen/graph500/graph500Gen.hpp"
 #include "graphGen/common/reduceIds.hpp"
 #include "bfs/bfsRunner.hpp"
-
 #include "utils/logging.hpp"
 #include "utils/prettyprint.hpp"
 #include "utils/argvparser.hpp"
 
+//External includes
 #include "mxx/utils.hpp"
 
 INITIALIZE_EASYLOGGINGPP
@@ -41,15 +41,16 @@ int main(int argc, char** argv)
    * COMMAND LINE ARGUMENTS
    */
 
-  LOG_IF(!comm.rank(), INFO) << "Single BFS run on Kronecker graph";
+  LOG_IF(!comm.rank(), INFO) << "BFS runs on Kronecker graph";
 
   //Parse command line arguments
   ArgvParser cmd;
 
-  cmd.setIntroductoryDescription("Single BFS run on Kronecker graph");
+  cmd.setIntroductoryDescription("BFS runs on Kronecker graph");
   cmd.setHelpOption("h", "help", "Print this help page");
 
   cmd.defineOption("scale", "scale of the graph", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("iter", "max count of BFS iterations, default = INF", ArgvParser::OptionRequiresValue);
   cmd.defineOption("edgefactor", "edgefactor of the graph, default = 16", ArgvParser::OptionRequiresValue);
 
   int result = cmd.parse(argc, argv);
@@ -62,11 +63,24 @@ int main(int argc, char** argv)
   }
 
   //Graph params
-  uint8_t scale = std::stoi(cmd.optionValue("scale"));
-  uint8_t edgefactor = 16;
-  if(cmd.foundOption("edgefactor")) {
-    uint8_t edgefactor = std::stoi(cmd.optionValue("edgefactor"));
+  int scale = std::stoi(cmd.optionValue("scale"));
+  LOG_IF(!comm.rank(), INFO) << "scale -> " << scale;
+
+  std::size_t iterBound = std::numeric_limits<std::size_t>::max();
+  if(cmd.foundOption("iter")) {
+    std::stringstream sstream(cmd.optionValue("iter"));
+    sstream >> iterBound;
+    LOG_IF(!comm.rank(), INFO) << "BFS iterations count limit -> " << iterBound;
   }
+  else
+    LOG_IF(!comm.rank(), INFO) << "BFS iterations count limit -> No limit";
+
+
+  int edgefactor = 16;
+  if(cmd.foundOption("edgefactor")) {
+    edgefactor = std::stoi(cmd.optionValue("edgefactor"));
+  }
+  LOG_IF(!comm.rank(), INFO) << "Edgefactor -> " << edgefactor;
 
   /**
    * GENERATE GRAPH
@@ -111,11 +125,12 @@ int main(int argc, char** argv)
   {
     conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
 
-    //Run BFS once
-    bfsInstance.runBFSIterations(1, componentCountsResult); 
+    //Run BFS "iterBound" times
+    bfsInstance.runBFSIterations(iterBound, componentCountsResult); 
   }
 
-  LOG_IF(!comm.rank(), INFO) << "Component size traversed :" << componentCountsResult[0];
+  std::size_t verticesTraversed = std::accumulate(componentCountsResult.begin(), componentCountsResult.end(), 0);
+  LOG_IF(!comm.rank(), INFO) << "Count of vertices traversed :" << verticesTraversed;
 
   MPI_Finalize();
   return(0);
