@@ -21,6 +21,7 @@
 
 //External includes
 #include "mxx/utils.hpp"
+#include "mxx/timer.hpp"
 
 INITIALIZE_EASYLOGGINGPP
 using namespace std;
@@ -97,14 +98,20 @@ int main(int argc, char** argv)
   std::vector<vertexIdType> uniqueVertexList;
 
   {
+    mxx::section_timer timer(std::cerr, comm);
+
     //Object of the graph500 generator class
     conn::graphGen::graph500Gen g;
 
     //Populate the edgeList, using undirected mode that includes the edge and its reverse
     g.populateEdgeList(edgeList, scale, edgefactor, comm); 
 
+    timer.end_section("Graph generation completed");
+
     //Call the graph reducer function
     conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
+
+    timer.end_section("Graph vertices reduction completed for BFS");
   }
 
   //Count of vertices in the reduced graph
@@ -122,12 +129,18 @@ int main(int argc, char** argv)
   //For saving the size of component discovered using BFS
   std::vector<std::size_t> componentCountsResult;
 
+
   {
+    mxx::section_timer timer(std::cerr, comm);
+
     conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
 
     //Run BFS "iterBound" times
     bfsInstance.runBFSIterations(iterBound, componentCountsResult); 
+
+    timer.end_section("BFS iterations completed");
   }
+
 
   std::size_t verticesTraversed = std::accumulate(componentCountsResult.begin(), componentCountsResult.end(), 0);
   LOG_IF(!comm.rank(), INFO) << "Count of vertices traversed :" << verticesTraversed;

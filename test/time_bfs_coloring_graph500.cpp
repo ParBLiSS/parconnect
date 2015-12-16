@@ -86,14 +86,20 @@ int main(int argc, char** argv)
   std::vector<vertexIdType> uniqueVertexList;
 
   {
+    mxx::section_timer timer(std::cerr, comm);
+
     //Object of the graph500 generator class
     conn::graphGen::graph500Gen g;
 
     //Populate the edgeList, using undirected mode that includes the edge and its reverse
     g.populateEdgeList(edgeList, scale, edgefactor, comm); 
 
+    timer.end_section("Graph generation completed");
+
     //Call the graph reducer function
     conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
+
+    timer.end_section("Graph vertices reduction completed for BFS");
   }
 
   //Count of vertices in the reduced graph
@@ -111,15 +117,23 @@ int main(int argc, char** argv)
   //For saving the size of component discovered using BFS
   std::vector<std::size_t> componentCountsResult;
 
+
   {
+    mxx::section_timer timer(std::cerr, comm);
+
     conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
 
     //Run BFS once
     bfsInstance.runBFSIterations(1, componentCountsResult); 
 
+    timer.end_section("BFS iteration completed");
+
     //Get the remaining edgeList
     bfsInstance.filterEdgeList();
+
+    timer.end_section("Edgelist filtered for coloring");
   }
+
 
   LOG_IF(!comm.rank(), INFO) << "Component size traversed : " << componentCountsResult[0];
 
@@ -127,10 +141,15 @@ int main(int argc, char** argv)
   auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
   LOG_IF(!comm.rank(), INFO) << "Total edge count remaining after BFS : " << totalEdgeCount;
 
+
   {
+    mxx::section_timer timer(std::cerr, comm);
+
     //Compute connected components
     conn::coloring::ccl<vertexIdType> cclInstance(edgeList, comm);
     cclInstance.compute();
+
+    timer.end_section("Coloring completed");
   }
 
   MPI_Finalize();

@@ -65,26 +65,36 @@ int main(int argc, char** argv)
     edgefactor = std::stoi(cmd.optionValue("edgefactor"));
   }
 
-  //Object of the graph500 generator class
-  conn::graphGen::graph500Gen g;
-
   //graph500 generator only uses int64_t
   using nodeIdType = int64_t;
 
   //Declare a edgeList vector to save edges
   std::vector< std::pair<nodeIdType, nodeIdType> > edgeList;
 
-  //Populate the edgeList
-  g.populateEdgeList(edgeList, scale, edgefactor, comm); 
+  {
+    mxx::section_timer timer(std::cerr, comm);
+
+    //Object of the graph500 generator class
+    conn::graphGen::graph500Gen g;
+
+    //Populate the edgeList
+    g.populateEdgeList(edgeList, scale, edgefactor, comm); 
+
+    timer.end_section("Graph generation completed");
+  }
 
   //Sum up the edge count across ranks
   auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
   LOG_IF(!comm.rank(), INFO) << "Total edge count is " << totalEdgeCount;
 
   {
+    mxx::section_timer timer(std::cerr, comm);
+
     //Compute connected components
     conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
     cclInstance.compute();
+
+    timer.end_section("Coloring completed");
   }
 
   MPI_Finalize();
