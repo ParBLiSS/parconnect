@@ -17,6 +17,7 @@
 //Own includes
 #include "utils/logging.hpp"
 #include "graphGen/common/reduceIds.hpp"
+#include "bfs/timer.hpp"
 
 //External includes
 #include "graph500-gen/make_graph.h"
@@ -60,6 +61,12 @@ namespace conn
           //TODO: Generalize these types
           OptBuf<int32_t, int64_t> optbuf;
 
+          //Degrees of each vertex (useful while computing MTEPS score)
+          FullyDistVec<E, E> degrees;
+
+          //Record MTEPS score of each iteration
+          std::vector<double> MTEPS;
+
           //combBLAS distributed storage for adjacency matrix
           booleanMatrixType A;
 
@@ -91,20 +98,33 @@ namespace conn
           //Copy our edgeList to CombBLAS format of edgeList
           DEL->GenGraphData(edgeList, vertexCount);
 
+          comm.barrier();
+
           integerMatrixType *G = new integerMatrixType(*DEL, false); 
           delete DEL;	// free memory
+
+          comm.barrier();
+
+          //Compute the vertex degrees
+          G->Reduce(degrees, Row, plus<E>(), static_cast<E>(0));	// Identity is 0 
+
+          comm.barrier();
 
           //Now represent the adj matrix in the boolean format
           A =  booleanMatrixType(*G);			// Convert to Boolean
           delete G;
-          //TODO: Do we have to symmetricize the matrix?
 
           //Copied the statement from TopDownBFS code
           //Some kind of optimization for graph500 graphs is expected here
           A.OptimizeForGraph500(optbuf);		          
 
+          comm.barrier();
+
           //Helper to initialize the unvisited vertices buffer
           FullyDistVec<E,E> tmp(A.getcommgrid(), A.getncol(), (E)-1);
+
+          //Record the local array size
+          localDistVecSize = tmp.LocArrSize();
 
           for(E i = 0; i < tmp.LocArrSize(); i++)
           {
@@ -124,24 +144,24 @@ namespace conn
          */
         void runBFSIterations(std::size_t noIterations, std::vector<std::size_t> &countComponentSizes)
         {
-
-          //Parent array (acts as a list of vertices in a component for us)
-          FullyDistVec<E, E> parents(A.getcommgrid(), A.getncol(), (E) -1);	// numerical values are stored 0-based
-
-          //Record the parents array size
-          localDistVecSize = parents.LocArrSize();
-
-          //Exscan of vertex count kept on previous ranks
-          E offsetForLocalToGlobal = mxx::exscan(localDistVecSize, comm);
-
+          //Execute BFS noIterations times
           for(int i = 0; i < noIterations; i++) 
           {
+            //Parent array (acts as a list of vertices in a component for us)
+            FullyDistVec<E, E> parents(A.getcommgrid(), A.getncol(), (E) -1);	// numerical values are stored 0-based
+
+            //Exscan of vertex count kept on previous ranks
+            E offsetForLocalToGlobal = mxx::exscan(localDistVecSize, comm);
+
             //Get the source vertex
             E srcPoint = getSource(offsetForLocalToGlobal);
 
             //If all vertices are visited, then exit
             if(srcPoint == MAX)
+            {
+              LOG_IF(comm.rank() == 0, INFO) << "All vertices already covered, no more BFS iterations required";
               break;
+            }
 
             //Frontier
             FullyDistSpVec<E, E> fringe(A.getcommgrid(), A.getncol());	// numerical values are stored 0-based
@@ -158,6 +178,8 @@ namespace conn
 
             //Set to 1 as we include the source
             std::size_t trackCountOfVerticesVisited = 1;
+
+            timePoint t1 = clock::now(); 
 
             //Till the frontier is non-empty
             while (fringe.getnnz() > 0)
@@ -182,7 +204,26 @@ namespace conn
             //Keep record of the number of vertices visited
             countComponentSizes.push_back(trackCountOfVerticesVisited);
 
-            MPI_Barrier(comm);
+            comm.barrier();
+
+            FullyDistSpVec<E, E> parentsp = parents.Find(std::bind2nd(std::greater<E>(), -1));
+            parentsp.Apply(myset<E>(1));
+
+            //Number of edges traversed
+            //std::size_t nEdgesTraversed = EWiseMult(parentsp, degrees, false, 0).Reduce(plus<E>(), 0);
+            E nEdgesTraversed = EWiseMult(parentsp, degrees, false, (E) 0).Reduce(plus<E>(), (E) 0);
+
+            //Record the end time of this BFS iteration
+            timePoint t2 = clock::now(); 
+
+            //MTEPS = Million edges traversed per second, time is computed in milli seconds
+            double MTEPS_Score = static_cast<double>(nEdgesTraversed) / duration(t2 - t1).count() /1000000000.0;
+
+            //Pushing the MTEPS score to our MTEPS vector
+            //Take the minimum, although they won't vary much due to barriers
+            MTEPS.push_back(mxx::allreduce(MTEPS_Score, mxx::min<double>(), comm));
+
+            comm.barrier();
           }
 
         }

@@ -72,7 +72,6 @@ TEST(bfsRunCheck, multipleUndirectedChainsSingleRun) {
   }
 }
 
-
 /**
  * @brief     Each rank initializes a chain graph of length 50, 
  *            and we run BFS over that p times
@@ -103,7 +102,66 @@ TEST(bfsRunCheck, multipleUndirectedChainsMultipleRuns) {
   {
     conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
     std::vector<std::size_t> componentCountsResult;
+
+    //Run p iterations
     bfsInstance.runBFSIterations(comm.size(), componentCountsResult); 
+
+    //Expected component sizes are 50 within each component
+    std::vector<std::size_t> componentCountsExpected(comm.size(), 50);
+
+    //Check the size of the vector returned
+    bool check1 = (componentCountsResult.size() == comm.size());
+
+    //Check the values of the vector returned
+    bool check2 = std::equal(componentCountsResult.begin(), componentCountsResult.end(), componentCountsExpected.begin());
+
+    //Remove the edges associated with the visited components
+    bfsInstance.filterEdgeList();
+
+    //We should be left with no edges after exectuting bfs above
+    auto leftEdgesCount = conn::graphGen::globalSizeOfVector(edgeList, comm);
+
+    ASSERT_EQ(check1, true); 
+    ASSERT_EQ(check2, true);
+    ASSERT_EQ(leftEdgesCount, 0);
+  }
+}
+
+/**
+ * @brief     Each rank initializes a chain graph of length 50, 
+ *            and we run BFS over that p times but 1 iteration per 
+ *            function call
+ */
+TEST(bfsRunCheck, multipleUndirectedChainsMultipleRunsOneAtTime) {
+
+  mxx::comm comm = mxx::comm();
+
+  //Type to use for vertices
+  using vertexIdType = int64_t;
+
+  //Distributed edge list
+  std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;
+
+  std::size_t offset = 50*comm.rank();
+
+  //Each rank builds undirected chain of length 50
+  //[0---49], [50---99] and so on
+  for(int i = 0; i < 49; i ++)
+  {
+    edgeList.emplace_back(i    +offset, i+1  +offset);
+    edgeList.emplace_back(i+1  +offset, i    +offset);
+  }
+
+  //Count of vertices
+  std::size_t nVertices = 50*comm.size();
+
+  {
+    conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
+    std::vector<std::size_t> componentCountsResult;
+
+    //Run 1 iteration p times
+    for(int i = 0; i < comm.size(); i++)
+      bfsInstance.runBFSIterations(1, componentCountsResult); 
 
     //Expected component sizes are 50 within each component
     std::vector<std::size_t> componentCountsExpected(comm.size(), 50);

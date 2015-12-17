@@ -18,6 +18,7 @@
 
 //Own includes
 #include "utils/commonfuncs.hpp"
+#include "graphGen/common/utils.hpp"
 
 //External includes
 #include "mxx/distribution.hpp"
@@ -110,6 +111,9 @@ namespace conn
      * @param[out] uniqueVertexList   distributed array of original vertex ids (global index of vertex here is its new id)
      * @details                       Implemented using bucketing and all2all communication
      *                                Due to all2all, this function call will not have good scalability
+     *
+     * //TODO : Rewrite this function by bucketing vertices instead of edges
+     *          which will promise load balance irrespective of initial labels
      */
     template <typename E>
       void reduceVertexIds(std::vector<std::pair<E,E>> &edgeList, std::vector<E> &uniqueVertexList, mxx::comm &comm)
@@ -132,6 +136,7 @@ namespace conn
         auto last = std::unique(uniqueVertexList.begin(), uniqueVertexList.end());
         uniqueVertexList.erase(last, uniqueVertexList.end());
 
+        //Does the graph have enough unique vertices?
         assert(uniqueVertexList.size() > 0);
 
         //Sort the vertices, remove the duplicates and enable equal distribution
@@ -164,6 +169,7 @@ namespace conn
           edgeToBucketAssignment<E, SRC>  edgeRankAssigner(allSplitters);
 
           mxx::all2all_func(edgeList, edgeRankAssigner, comm);
+          printEdgeListDistribution(edgeList.begin(), edgeList.end(), comm);
 
           //Local sort
           edgeComparator<SRC> cmp;
@@ -182,6 +188,8 @@ namespace conn
             std::for_each(edgeListRange.first, edgeListRange.second, [&](std::pair<E,E> &e){
                 std::get<SRC>(e) = trueId;
                 });
+
+            it2 = edgeListRange.second;
           }
         }
 
@@ -192,6 +200,7 @@ namespace conn
 
           //Do all to all
           mxx::all2all_func(edgeList, edgeRankAssigner, comm);
+          printEdgeListDistribution(edgeList.begin(), edgeList.end(), comm);
 
           //Local sort
           edgeComparator<DEST> cmp;
@@ -210,6 +219,8 @@ namespace conn
             std::for_each(edgeListRange.first, edgeListRange.second, [&](std::pair<E,E> &e){
                 std::get<DEST>(e) = trueId;
                 });
+
+            it2 = edgeListRange.second;
           }
         }
 
