@@ -2598,11 +2598,13 @@ public:
     void setToDefault(void) {
         setGlobally(ConfigurationType::Enabled, std::string("true"), true);
 #if !defined(ELPP_NO_DEFAULT_LOG_FILE)
-        setGlobally(ConfigurationType::Filename, std::string(base::consts::kDefaultLogFile), true);
+        //CJ changed this configurations to avoid renundant log files 
+        //setGlobally(ConfigurationType::Filename, std::string(base::consts::kDefaultLogFile), true);
 #else
         ELPP_UNUSED(base::consts::kDefaultLogFile);
 #endif  // !defined(ELPP_NO_DEFAULT_LOG_FILE)
-        setGlobally(ConfigurationType::ToFile, std::string("true"), true);
+        //CJ changed this configurations to avoid renundant log files 
+        //setGlobally(ConfigurationType::ToFile, std::string("true"), true);
         setGlobally(ConfigurationType::ToStandardOutput, std::string("true"), true);
         setGlobally(ConfigurationType::MillisecondsWidth, std::string("3"), true);
         setGlobally(ConfigurationType::PerformanceTracking, std::string("true"), true);

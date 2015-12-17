@@ -142,8 +142,13 @@ int main(int argc, char** argv)
   }
 
 
-  std::size_t verticesTraversed = std::accumulate(componentCountsResult.begin(), componentCountsResult.end(), 0);
-  LOG_IF(!comm.rank(), INFO) << "Count of vertices traversed :" << verticesTraversed;
+  std::size_t totalVerticesTraversed = std::accumulate(componentCountsResult.begin(), componentCountsResult.end(), 0);
+
+  std::size_t verticesInLargestComponent = *std::max_element(componentCountsResult.begin(), componentCountsResult.end());
+
+  LOG_IF(!comm.rank(), INFO) << "Count of vertices traversed :" << totalVerticesTraversed;
+  LOG_IF(!comm.rank(), INFO) << "Count of components :" << componentCountsResult.size();
+  LOG_IF(!comm.rank(), INFO) << "Largest Component vertex count :" << verticesInLargestComponent;
 
   MPI_Finalize();
   return(0);
