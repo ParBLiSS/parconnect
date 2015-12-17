@@ -280,6 +280,8 @@ namespace conn
 
               //Insert these edges to our new edgeList
               edgeListNew.insert(edgeListNew.end(), edgeListRange.first, edgeListRange.second);
+
+              it2 = edgeListRange.second;
             }
           }
 
