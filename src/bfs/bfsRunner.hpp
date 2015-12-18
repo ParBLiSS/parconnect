@@ -231,8 +231,8 @@ namespace conn
         /**
          * @brief                             Remove the edges corresponding to vertices which have been 
          *                                    covered by BFS
-         * @details                           Find the splitters from the unVisitedVertices and split the edges
-         *                                    based on their DEST values 
+         * @details                           Find the splitters from the sorted edgelist and bucket the
+         *                                    unvisited vertices
          *                                    Do all2all and remove the edges through linear scan
          * @note                              This function should be called after running the BFS iterations. 
          */
@@ -244,13 +244,8 @@ namespace conn
           //Copy all the unvisited elements from set to vector 
           std::vector<E> unVisitedVerticesArray(unVisitedVertices.begin(), unVisitedVertices.end());
           std::for_each(unVisitedVerticesArray.begin(), unVisitedVerticesArray.end(), [&](E& d){d += offsetForLocalToGlobal;});
-          std::sort(unVisitedVerticesArray.begin(), unVisitedVerticesArray.end());
 
-          //Now each rank contains the globally sorted list of vertices that were not visited during BFS
-
-          //Define the splitters using the exscan value obtained above
-          auto allSplitters = mxx::allgather(offsetForLocalToGlobal);
-          allSplitters.erase(allSplitters.begin());
+          //Now each rank contains the list of vertices that were not visited during BFS
 
           //New edgelist  
           std::vector< std::pair<E,E> > edgeListNew;
@@ -259,24 +254,38 @@ namespace conn
           {
             const int SRC = 0, DEST = 1;
 
-            //Initialize functor that assigns bucket id to each edge by its source vertex
-            conn::graphGen::edgeToBucketAssignment<E, DEST>  edgeRankAssigner(allSplitters);
+            //Globally sort all the edges by SRC layer
+            //Should be quick as edgeList was latest sorted by SRC while reducing ids
+            conn::graphGen::edgeComparator<SRC> cmp;
+            mxx::sort(edgeList.begin(), edgeList.end(), cmp);
 
-            mxx::all2all_func(edgeList, edgeRankAssigner, comm);
+            //Define the splitters using the first SRC element of the edge
+            auto allSplitters = mxx::allgather(std::get<SRC>(edgeList.front()));
+            allSplitters.erase(allSplitters.begin());
+
+            //Initialize functor that assigns rank to all the unique vertices 
+            conn::graphGen::vertexToBucketAssignment<E> vertexRankAssigner(allSplitters);
+
+            //All2all to perform the bucketing
+            mxx::all2all_func(unVisitedVerticesArray, vertexRankAssigner, comm);
 
             //Local sort
-            conn::graphGen::edgeComparator<DEST> cmp;
-            std::sort(edgeList.begin(), edgeList.end(), cmp);
+            std::sort(unVisitedVerticesArray.begin(), unVisitedVerticesArray.end());
+
+            //To resolve the boundary splits across edgelist, we need to do a left shift of first element
+            //of this array from ranks 1.. p-1
+            E nextProcsFirstUnvisitedVertex = mxx::left_shift(unVisitedVerticesArray.front(), comm);
+
+            //ranks 0.. p-2
+            if(comm.rank() < comm.size() - 1)
+              unVisitedVerticesArray.push_back(nextProcsFirstUnvisitedVertex);
 
             //Start traversal over vertex array
             auto it2 = edgeList.begin();
             for(auto it = unVisitedVerticesArray.begin(); it != unVisitedVerticesArray.end(); it++)
             {
-              //Edges whose DEST element equals the unvisited vertex element
+              //Edges whose SRC element equals the unvisited vertex element
               auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, cmp); 
-
-              //There ought to be atleast one edge for this vertex
-              assert(std::distance(edgeListRange.first , edgeListRange.second) > 0);
 
               //Insert these edges to our new edgeList
               edgeListNew.insert(edgeListNew.end(), edgeListRange.first, edgeListRange.second);
