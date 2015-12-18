@@ -65,11 +65,14 @@ int main(int argc, char** argv)
   }
 
   //Graph params
-  uint8_t scale = std::stoi(cmd.optionValue("scale"));
-  uint8_t edgefactor = 16;
+  int scale = std::stoi(cmd.optionValue("scale"));
+  LOG_IF(!comm.rank(), INFO) << "scale -> " << scale;
+
+  int edgefactor = 16;
   if(cmd.foundOption("edgefactor")) {
-    uint8_t edgefactor = std::stoi(cmd.optionValue("edgefactor"));
+    edgefactor = std::stoi(cmd.optionValue("edgefactor"));
   }
+  LOG_IF(!comm.rank(), INFO) << "Edgefactor -> " << edgefactor;
 
   /**
    * GENERATE GRAPH

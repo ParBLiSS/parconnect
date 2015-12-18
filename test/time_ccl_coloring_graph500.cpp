@@ -13,6 +13,7 @@
 
 //Own includes
 #include "graphGen/graph500/graph500Gen.hpp"
+#include "graphGen/common/reduceIds.hpp"
 #include "coloring/labelProp.hpp"
 #include "utils/logging.hpp"
 #include "utils/argvparser.hpp"
@@ -58,12 +59,15 @@ int main(int argc, char** argv)
   }
 
   //Graph params
-  uint8_t scale = std::stoi(cmd.optionValue("scale"));
+  int scale = std::stoi(cmd.optionValue("scale"));
+  LOG_IF(!comm.rank(), INFO) << "scale -> " << scale;
 
-  uint8_t edgefactor = 16;
+  int edgefactor = 16;
   if(cmd.foundOption("edgefactor")) {
     edgefactor = std::stoi(cmd.optionValue("edgefactor"));
   }
+  LOG_IF(!comm.rank(), INFO) << "Edgefactor -> " << edgefactor;
+
 
   //graph500 generator only uses int64_t
   using nodeIdType = int64_t;
@@ -83,9 +87,10 @@ int main(int argc, char** argv)
     timer.end_section("Graph generation completed");
   }
 
-  //Sum up the edge count across ranks
-  auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
-  LOG_IF(!comm.rank(), INFO) << "Total edge count is " << totalEdgeCount;
+  //Count of edges in the graph
+  std::size_t nEdges = conn::graphGen::globalSizeOfVector(edgeList, comm);
+
+  LOG_IF(!comm.rank(), INFO) << "Graph size : edges [when every (u,v) has a (v,u) edge] -> " << nEdges;
 
   {
     mxx::section_timer timer(std::cerr, comm);
