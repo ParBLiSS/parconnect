@@ -47,6 +47,7 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/ext/CombBLAS")
 # include external repo : mxx, graph500-gen
 include_directories("${PROJECT_SOURCE_DIR}/ext/mxx/include")
 include_directories("${PROJECT_SOURCE_DIR}/ext")
+include_directories("${PROJECT_SOURCE_DIR}/ext/bliss/src/")
 
 
 # include src files
