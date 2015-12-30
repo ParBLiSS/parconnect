@@ -44,13 +44,20 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH "Output director
 # compile CombBLAS
 add_subdirectory("${PROJECT_SOURCE_DIR}/ext/CombBLAS")
 
-# include external repo : mxx, graph500-gen
+# include external repositories : mxx, graph500-gen, bliss 
 include_directories("${PROJECT_SOURCE_DIR}/ext/mxx/include")
 include_directories("${PROJECT_SOURCE_DIR}/ext")
+
+#BLISS
+add_subdirectory("${PROJECT_SOURCE_DIR}/ext/bliss")   #BLISS cmake needs to be executed
 include_directories("${PROJECT_SOURCE_DIR}/ext/bliss/src/")
+include_directories("${PROJECT_SOURCE_DIR}/ext/bliss/ext/")
+
+#include our build directory for bliss config files
+include_directories("${CMAKE_BINARY_DIR}")
 
 
-# include src files
+# include our src files
 include_directories("${PROJECT_SOURCE_DIR}/src")
 
 # add gtest

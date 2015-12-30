@@ -89,7 +89,7 @@ TEST(graphGen, reduceIdgraph500) {
 
   {
     //Object of the graph500 generator class
-    conn::graphGen::graph500Gen g;
+    conn::graphGen::Graph500Gen g;
 
     int scale = 11, edgefactor = 16;
 

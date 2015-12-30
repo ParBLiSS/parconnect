@@ -29,7 +29,7 @@ namespace conn
      * @class     conn::graphGen::graph500Gen
      * @brief     Wraps around the c code for graph500 generation
      */
-    class graph500Gen
+    class Graph500Gen
     {
       public:
         //edge id is restricted to type int64_t in the c code, so we use the same 
@@ -91,7 +91,7 @@ namespace conn
 
     };
 
-    const double graph500Gen::initiator[4] =  {.57, .19, .19, .05};
+    const double Graph500Gen::initiator[4] =  {.57, .19, .19, .05};
   }
 }
 

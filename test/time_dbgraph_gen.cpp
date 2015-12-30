@@ -26,6 +26,7 @@ INITIALIZE_EASYLOGGINGPP
 using namespace std;
 using namespace CommandLineProcessing;
 
+
 int main(int argc, char** argv)
 {
   // Initialize the MPI library:
@@ -60,14 +61,16 @@ int main(int argc, char** argv)
   std::string fileName = cmd.optionValue("file");
   LOG_IF(!comm.rank(), INFO) << "Input file -> " << fileName;
 
-  //Object of the graph generator class
-  conn::graphGen::deBruijnGraph<bliss::de_bruijn::de_bruijn_engine<Uint8NodeMapType>,  bliss::io::FASTAParser2> g;
-
   //Declare a edgeList vector to save edges
   std::vector< std::pair<std::size_t, std::size_t> > edgeList;
 
-  //Populate the edgeList
-  g.populateEdgeList(edgeList, fileName, comm); 
+  {
+    //Object of the graph generator class
+    conn::graphGen::deBruijnGraph g;
+
+    //Populate the edgeList
+    g.populateEdgeList(edgeList, fileName, comm); 
+  }
 
   //Sum up the edge count across ranks
   auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
@@ -76,6 +79,3 @@ int main(int argc, char** argv)
   MPI_Finalize();
   return(0);
 }
- 
-
-

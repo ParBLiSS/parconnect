@@ -22,8 +22,8 @@ target_link_libraries(time_bfs_graph500 ${EXTRA_LIBS} MPITypelib CommGridlib)
 add_executable(time_bfs_coloring_graph500 time_bfs_coloring_graph500.cpp)
 target_link_libraries(time_bfs_coloring_graph500  ${EXTRA_LIBS} MPITypelib CommGridlib)
 
-#add_executable(time_dbgraph_gen time_dbgraph_gen.cpp)
-#target_link_libraries(time_dbgraph_gen  ${EXTRA_LIBS})
+add_executable(time_dbgraph_gen time_dbgraph_gen.cpp)
+target_link_libraries(time_dbgraph_gen  ${EXTRA_LIBS})
 
 #################
 ## CORRECTNESS ##

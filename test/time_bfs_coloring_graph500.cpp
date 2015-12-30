@@ -92,7 +92,7 @@ int main(int argc, char** argv)
     mxx::section_timer timer(std::cerr, comm);
 
     //Object of the graph500 generator class
-    conn::graphGen::graph500Gen g;
+    conn::graphGen::Graph500Gen g;
 
     //Populate the edgeList, using undirected mode that includes the edge and its reverse
     g.populateEdgeList(edgeList, scale, edgefactor, comm); 

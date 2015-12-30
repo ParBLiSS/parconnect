@@ -66,7 +66,7 @@ int main(int argc, char** argv)
   LOG_IF(!comm.rank(), INFO) << "Edgefactor -> " << edgefactor;
 
   //Object of the graph500 generator class
-  conn::graphGen::graph500Gen g;
+  conn::graphGen::Graph500Gen g;
 
   //Declare a edgeList vector to save edges
   std::vector< std::pair<int64_t, int64_t> > edgeList;
