@@ -1,6 +1,6 @@
 [submodule "ext/mxx"]
 	path = ext/mxx
-	url = git@github.com:cjain7/mxx.git
+	url = https://github.com/patflick/mxx.git
 [submodule "ext/bliss"]
 	path = ext/bliss
 	url = git@bitbucket.org:AluruLab/bliss.git
