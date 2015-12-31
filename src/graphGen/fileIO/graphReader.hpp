@@ -42,6 +42,9 @@ namespace conn
         //MPI communicator
         mxx::comm comm;
 
+        //Switch to determine if reverse of each edge should be included as well
+        bool addReverseEdge;
+
         //Reference to the distributed edge list 
         std::vector< std::pair<E,E> > &edgeList;
 
@@ -53,8 +56,10 @@ namespace conn
          * @param[in] comm        mpi communicator
          */
         template <typename vID>
-          GraphFileParser(std::vector< std::pair<vID, vID> > &edgeList,
-              const mxx::comm &comm) : edgeList(edgeList), comm(comm.copy())
+          GraphFileParser(std::vector< std::pair<vID, vID> > &edgeList, bool addReverseEdge,
+              const mxx::comm &comm) :  edgeList(edgeList), 
+                                        addReverseEdge(addReverseEdge),
+                                        comm(comm.copy())
           {}
 
 
@@ -199,7 +204,11 @@ namespace conn
           stream >> vertex2;
 
           if(n == 1)
+          {
             edgeList.emplace_back(vertex1, vertex2);
+            if(addReverseEdge)
+              edgeList.emplace_back(vertex2, vertex1);
+          }
         }
     };
   }

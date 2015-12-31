@@ -36,7 +36,7 @@ int main(int argc, char** argv)
   //Print mpi rank distribution
   mxx::print_node_distribution();
 
-  LOG_IF(!comm.rank(), INFO) << "Code to time graph construction by reading a file";
+  LOG_IF(!comm.rank(), INFO) << "Code for the graph construction by reading a file";
 
   //Parse command line arguments
   ArgvParser cmd;
@@ -45,6 +45,7 @@ int main(int argc, char** argv)
   cmd.setHelpOption("h", "help", "Print this help page");
 
   cmd.defineOption("file", "input file with edges written along the rows", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("addreverse", "(y/n) y implies reverse of each edge will also be added", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
 
   int result = cmd.parse(argc, argv);
 
@@ -57,7 +58,11 @@ int main(int argc, char** argv)
 
   //Graph params
   std::string fileName = cmd.optionValue("file");
+  bool addReverse = !cmd.optionValue("addreverse").compare("y");  //compare returns 0 iff equal
+
   LOG_IF(!comm.rank(), INFO) << "Input file -> " << fileName;
+  if(addReverse)  LOG_IF(!comm.rank(), INFO) << "Reverse of each edge will be included";
+  if(!addReverse)  LOG_IF(!comm.rank(), INFO) << "Reverse of each edge will not be included";
 
   typedef std::size_t vertexIdType;
 
@@ -65,7 +70,7 @@ int main(int argc, char** argv)
   std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;
 
   {
-    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, comm);
+    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addReverse, comm);
 
     g.populateEdgeList(fileName);
   }
