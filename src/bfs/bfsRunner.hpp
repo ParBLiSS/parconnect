@@ -41,13 +41,14 @@ namespace conn
         private:
 
           //BFS implementation uses signed integer types
-          using E = typename std::make_signed<vertexIdType>::type;
+          static_assert(std::numeric_limits<vertexIdType>::is_signed, "vertexIdType should be a signed type");
+          typedef vertexIdType E;
 
           //Distributed set of unvisited vertices
           std::unordered_set<E> unVisitedVertices;
 
           //Reference to the distributed edge list 
-          std::vector< std::pair<E,E> > &edgeList;
+          std::vector< std::pair<E, E> > &edgeList;
 
           //Matrix type, to store the adjacency matrix (bool values)
           //from combBLAS implementation 
@@ -89,7 +90,7 @@ namespace conn
          * @param[in] comm        mpi communicator
          *                        TODO : Enable the communicator restriction on all the BFS functions
          */
-        bfsSupport(std::vector< std::pair<E,E> > &edgeList, std::size_t vertexCount,
+        bfsSupport(std::vector< std::pair<E, E> > &edgeList, std::size_t vertexCount,
                   const mxx::comm &comm) : edgeList(edgeList), comm(comm.copy())
         {
           //List of edges, distributed in 1D fashion

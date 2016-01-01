@@ -64,7 +64,7 @@ int main(int argc, char** argv)
   if(addReverse)  LOG_IF(!comm.rank(), INFO) << "Reverse of each edge will be included";
   if(!addReverse)  LOG_IF(!comm.rank(), INFO) << "Reverse of each edge will not be included";
 
-  typedef std::size_t vertexIdType;
+  typedef int64_t vertexIdType;
 
   //Declare a edgeList vector to save edges
   std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;

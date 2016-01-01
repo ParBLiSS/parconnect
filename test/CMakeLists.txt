@@ -28,6 +28,12 @@ target_link_libraries(time_dbgraph_gen  ${EXTRA_LIBS})
 add_executable(time_graphFileIO_gen time_graphFileIO_gen.cpp)
 target_link_libraries(time_graphFileIO_gen  ${EXTRA_LIBS})
 
+add_executable(time_bfs_coloring_debruijn_graph time_bfs_coloring_debruijn_graph.cpp)
+target_link_libraries(time_bfs_coloring_debruijn_graph ${EXTRA_LIBS} MPITypelib CommGridlib)
+
+add_executable(time_bfs_coloring_fileInput time_bfs_coloring_fileInput.cpp)
+target_link_libraries(time_bfs_coloring_fileInput ${EXTRA_LIBS} MPITypelib CommGridlib)
+
 #################
 ## CORRECTNESS ##
 #################
