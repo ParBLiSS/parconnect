@@ -12,9 +12,11 @@
 
 //Own inlcudes
 #include "utils/logging.hpp"
+#include "utils/commonfuncs.hpp"
 
 //external includes
 #include "mxx/reduction.hpp"
+#include "mxx/sort.hpp"
 
 namespace conn 
 {
@@ -37,6 +39,49 @@ namespace conn
 
         auto sep = ",";
         LOG_IF(comm.rank() == 0, INFO) << "Distribution of edge list; min-mean-max : " << minLoad << sep << meanLoad << sep << maxLoad;
+      }
+
+    /**
+     * @brief     Helper function to confirm edges are represented in both directions
+     * @note      Use while debugging or testing only
+     * @details   let E1 be the order of edgeList sorted by <SRC, DEST> and E2 be the 
+     *            copy of edgeList sorted by <DEST, SRC>. Then ith edge in E1 should
+     *            be equal to flip of ith edge in E2
+     * @return    true if the check passes on all the MPI ranks
+     */
+    template <typename E>
+      bool checkEdgeBidirectionality( std::vector< std::pair<E,E> > &edgeList1, mxx::comm &comm)
+      {
+        const int SRC = 0, DEST = 1;
+
+        assert(std::distance(edgeList1.begin(), edgeList1.end()) > 0);
+
+        //Create a copy
+        auto edgeList2 = edgeList1;
+
+        //Sort edgeList1 by SRC, DEST
+        mxx::sort(edgeList1.begin(), edgeList1.end(), conn::utils::TpleComp2Layers<SRC, DEST>(), comm);
+
+        //Sort edgeList2 by DEST, SRC
+        mxx::sort(edgeList2.begin(), edgeList2.end(), conn::utils::TpleComp2Layers<DEST, SRC>(), comm);
+        
+        bool localCheck = true; 
+
+        //Check equality 
+        for(int i = 0; i < edgeList1.size(); i++)
+        {
+          localCheck = localCheck && (edgeList1[i].first == edgeList2[i].second);
+          localCheck = localCheck && (edgeList1[i].second == edgeList2[i].first);
+        }
+
+        //Check if the condition passed on all ranks
+        unsigned char localCheckVal = (unsigned char) localCheck;
+        unsigned char globalCheckVal = mxx::allreduce(localCheckVal, mxx::min<unsigned char>(), comm); 
+        
+        if(globalCheckVal == 0)
+          return false;
+        else
+          return true;
       }
 
   }

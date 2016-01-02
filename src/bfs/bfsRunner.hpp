@@ -16,6 +16,7 @@
 
 //Own includes
 #include "utils/logging.hpp"
+#include "utils/commonfuncs.hpp"
 #include "graphGen/common/reduceIds.hpp"
 #include "bfs/timer.hpp"
 
@@ -257,8 +258,7 @@ namespace conn
 
             //Globally sort all the edges by SRC layer
             //Should be quick as edgeList was latest sorted by SRC while reducing ids
-            conn::graphGen::edgeComparator<SRC> cmp;
-            mxx::sort(edgeList.begin(), edgeList.end(), cmp);
+            mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>(), comm);
 
             //Define the splitters using the first SRC element of the edge
             auto allSplitters = mxx::allgather(std::get<SRC>(edgeList.front()));
@@ -286,7 +286,7 @@ namespace conn
             for(auto it = unVisitedVerticesArray.begin(); it != unVisitedVerticesArray.end(); it++)
             {
               //Edges whose SRC element equals the unvisited vertex element
-              auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, cmp); 
+              auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, conn::utils::TpleComp<SRC>()); 
 
               //Insert these edges to our new edgeList
               edgeListNew.insert(edgeListNew.end(), edgeListRange.first, edgeListRange.second);

@@ -13,6 +13,7 @@
 
 //Own includes
 #include "graphGen/deBruijn/deBruijnGraphGen.hpp"
+#include "graphGen/common/utils.hpp"
 #include "utils/logging.hpp"
 #include "utils/argvparser.hpp"
 
@@ -75,6 +76,12 @@ int main(int argc, char** argv)
   //Sum up the edge count across ranks
   auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
   LOG_IF(!comm.rank(), INFO) << "Total edge count is " << totalEdgeCount;
+
+  //Check if each edge is added in both directions
+  bool graphFormatCheck = conn::graphGen::checkEdgeBidirectionality(edgeList, comm);
+
+  LOG_IF(!comm.rank() && graphFormatCheck, INFO) <<  "Graph format check passed";
+  LOG_IF(!comm.rank() && !graphFormatCheck, INFO) << "Graph format check failed";
 
   MPI_Finalize();
   return(0);

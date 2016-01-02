@@ -14,7 +14,6 @@
 #include <iostream>
 
 //Own includes
-#include "coloring/tupleComp.hpp"
 #include "coloring/labelProp_utils.hpp"
 #include "coloring/timer.hpp" //Timer switch 
 #include "utils/commonfuncs.hpp"
@@ -141,7 +140,7 @@ namespace conn
           Timer timer(std::cerr, comm);
 
           //Sort the edgeList by src id of each edge
-          mxx::sort(edgeList.begin(), edgeList.end(), TpleComp<edgeListTIds::src>(), comm); 
+          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<edgeListTIds::src>(), comm); 
 
           //Reserve the approximate required space in our vector
           tupleVector.reserve(edgeList.size());
@@ -149,7 +148,7 @@ namespace conn
           for(auto it = edgeList.begin(); it != edgeList.end(); )
           {
             //Range of edges with same source vertex
-            auto equalRange = conn::utils::findRange(it, edgeList.end(), *it, TpleComp<edgeListTIds::src>());
+            auto equalRange = conn::utils::findRange(it, edgeList.end(), *it, conn::utils::TpleComp<edgeListTIds::src>());
 
             //Range would include atleast 1 element
             assert(std::distance(equalRange.first, equalRange.second) >= 1);
@@ -268,37 +267,37 @@ namespace conn
         void updatePn(Iterator begin, Iterator end)
         {
           //Sort by nid,Pc
-          mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::nId, cclTupleIds::Pc>(), comm); 
+          mxx::sort(begin, end, conn::utils::TpleComp2Layers<cclTupleIds::nId, cclTupleIds::Pc>(), comm); 
 
           //Resolve last and first bucket's boundary splits
           
           //First, find the element with max node id and min Pc locally 
           //Or in other words, get the min Pc of the last bucket
-          auto minPcOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>());
+          auto minPcOfLastBucket = mxx::local_reduce(begin, end, conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>());
 
           //Second, do exscan, look for max nodeid and min Pc on previous ranks
-          auto prevMinPc = mxx::exscan(minPcOfLastBucket, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>(), comm);  
+          auto prevMinPc = mxx::exscan(minPcOfLastBucket, conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>(), comm);  
 
           //We also need to know max Pc of the first bucket on the next rank (to check for stability)
-          auto maxPcOfFirstBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>());
+          auto maxPcOfFirstBucket = mxx::local_reduce(begin, end, conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>());
 
           //reverse exscan, look for min nodeid and max Pc on forward ranks
-          auto nextMaxPc = mxx::exscan(maxPcOfFirstBucket,  TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>(), comm.reverse()); 
+          auto nextMaxPc = mxx::exscan(maxPcOfFirstBucket,  conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>(), comm.reverse()); 
 
           //Now we can update the Pn layer of all the buckets locally
           for(auto it = begin; it !=  end;)
           {
             //Range of tuples with the same node id
-            auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::nId>());
+            auto equalRange = conn::utils::findRange(it, end, *it, conn::utils::TpleComp<cclTupleIds::nId>());
 
             //Range would include atleast 1 element
             assert(std::distance(equalRange.first, equalRange.second) >= 1);
 
             //Minimum Pc from local bucket
-            auto thisBucketsMinPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pc>());
+            auto thisBucketsMinPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, conn::utils::TpleReduce<cclTupleIds::Pc>());
 
             //Maximum Pc from local bucket
-            auto thisBucketsMaxPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pc, std::greater>());
+            auto thisBucketsMaxPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, conn::utils::TpleReduce<cclTupleIds::Pc, std::greater>());
 
             //For now, mark global minimum as local
             auto thisBucketsMaxPcGlobal = thisBucketsMaxPcLocal;
@@ -308,18 +307,18 @@ namespace conn
             if(equalRange.first == begin)
             {
               //Use value from previous rank
-              thisBucketsMinPcGlobal =  comm.rank() == 0 ? thisBucketsMinPcLocal : TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>() (prevMinPc, thisBucketsMinPcLocal);
+              thisBucketsMinPcGlobal =  comm.rank() == 0 ? thisBucketsMinPcLocal : conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>() (prevMinPc, thisBucketsMinPcLocal);
             }
 
             if(equalRange.second == end)
             {
               //Use value from next rank
-              thisBucketsMaxPcGlobal = comm.rank() == comm.size() - 1 ? thisBucketsMaxPcLocal : TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>() (nextMaxPc, thisBucketsMaxPcLocal);
+              thisBucketsMaxPcGlobal = comm.rank() == comm.size() - 1 ? thisBucketsMaxPcLocal : conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::less, std::greater>() (nextMaxPc, thisBucketsMaxPcLocal);
 
             }
 
             //If min Pc < max Pc for this bucket, update Pn or else mark them as stable
-            if(TpleComp<cclTupleIds::Pc>()(thisBucketsMinPcGlobal, thisBucketsMaxPcGlobal))
+            if(conn::utils::TpleComp<cclTupleIds::Pc>()(thisBucketsMinPcGlobal, thisBucketsMaxPcGlobal))
               std::for_each(equalRange.first, equalRange.second, [&](T &e){
                   std::get<cclTupleIds::Pn>(e) = std::get<cclTupleIds::Pc>(thisBucketsMinPcGlobal);
                   });
@@ -347,29 +346,29 @@ namespace conn
             uint8_t converged = 1;    // 1 means true, we will update it below
 
             //Sort by Pc, Pn
-            mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::Pc, cclTupleIds::Pn>(), comm); 
+            mxx::sort(begin, end, conn::utils::TpleComp2Layers<cclTupleIds::Pc, cclTupleIds::Pn>(), comm); 
 
             //Resolve last bucket's boundary split
             
             //First, find the element with max Pc and min Pn locally 
             //Or in other words, get the min Pn of the last bucket
-            auto minPnOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>());
+            auto minPnOfLastBucket = mxx::local_reduce(begin, end, conn::utils::TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>());
 
             //Result of exscan, again look for max Pc and min Pn on previous ranks
-            auto prevMinPn = mxx::exscan(minPnOfLastBucket, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
+            auto prevMinPn = mxx::exscan(minPnOfLastBucket, conn::utils::TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
 
 
             //Now we can update the Pc layer of all the buckets locally
             for(auto it = begin; it !=  end;)
             {
               //Range of tuples with the same Pc
-              auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::Pc>());
+              auto equalRange = conn::utils::findRange(it, end, *it, conn::utils::TpleComp<cclTupleIds::Pc>());
 
               //Range would include atleast 1 element
               assert(std::distance(equalRange.first, equalRange.second) >= 1);
 
               //Minimum Pn from local bucket
-              auto thisBucketsMinPnLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pn>());
+              auto thisBucketsMinPnLocal = mxx::local_reduce(equalRange.first, equalRange.second, conn::utils::TpleReduce<cclTupleIds::Pn>());
 
               //For now, mark global minimum as local
               auto thisBucketsMinPnGlobal = thisBucketsMinPnLocal;
@@ -379,7 +378,7 @@ namespace conn
               {
                 //Use value from previous rank
                 thisBucketsMinPnGlobal =  comm.rank() == 0 ?  thisBucketsMinPnLocal : 
-                  TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
+                  conn::utils::TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
               }
 
               //If min Pn < MAX_PID2 for this bucket, update the Pc to new value or else mark the partition as stable
@@ -448,18 +447,18 @@ namespace conn
             //   We can distinguish the 'parentRequest' tuples as they have Pc = MAX_PID
 
             //Same code as updatePn()
-            mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::nId, cclTupleIds::Pc>(), comm); 
-            auto minPcOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>());
-            auto prevMinPc = mxx::exscan(minPcOfLastBucket, TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>(), comm);  
+            mxx::sort(begin, end, conn::utils::TpleComp2Layers<cclTupleIds::nId, cclTupleIds::Pc>(), comm); 
+            auto minPcOfLastBucket = mxx::local_reduce(begin, end, conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>());
+            auto prevMinPc = mxx::exscan(minPcOfLastBucket, conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>(), comm);  
             for(auto it = begin; it !=  end;)
             {
-              auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::nId>());
-              auto thisBucketsMinPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pc>());
+              auto equalRange = conn::utils::findRange(it, end, *it, conn::utils::TpleComp<cclTupleIds::nId>());
+              auto thisBucketsMinPcLocal = mxx::local_reduce(equalRange.first, equalRange.second, conn::utils::TpleReduce<cclTupleIds::Pc>());
               auto thisBucketsMinPcGlobal = thisBucketsMinPcLocal;
               if(equalRange.first == begin)
               {
                 thisBucketsMinPcGlobal =  comm.rank() == 0 ? thisBucketsMinPcLocal : 
-                  TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>() (prevMinPc, thisBucketsMinPcLocal);
+                  conn::utils::TpleReduce2Layers<cclTupleIds::nId, cclTupleIds::Pc, std::greater, std::less>() (prevMinPc, thisBucketsMinPcLocal);
               }
 
               std::for_each(equalRange.first, equalRange.second, [&](T &e){
@@ -476,18 +475,18 @@ namespace conn
             }
 
             //2. Now repeat the procedure of updatePc()
-            mxx::sort(begin, end, TpleComp2Layers<cclTupleIds::Pc, cclTupleIds::Pn>(), comm); 
-            auto minPnOfLastBucket = mxx::local_reduce(begin, end, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>());
-            auto prevMinPn = mxx::exscan(minPnOfLastBucket, TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
+            mxx::sort(begin, end, conn::utils::TpleComp2Layers<cclTupleIds::Pc, cclTupleIds::Pn>(), comm); 
+            auto minPnOfLastBucket = mxx::local_reduce(begin, end, conn::utils::TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>());
+            auto prevMinPn = mxx::exscan(minPnOfLastBucket, conn::utils::TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>(), comm);  
             for(auto it = begin; it !=  end;)
             {
-              auto equalRange = conn::utils::findRange(it, end, *it, TpleComp<cclTupleIds::Pc>());
-              auto thisBucketsMinPnLocal = mxx::local_reduce(equalRange.first, equalRange.second, TpleReduce<cclTupleIds::Pn>());
+              auto equalRange = conn::utils::findRange(it, end, *it, conn::utils::TpleComp<cclTupleIds::Pc>());
+              auto thisBucketsMinPnLocal = mxx::local_reduce(equalRange.first, equalRange.second, conn::utils::TpleReduce<cclTupleIds::Pn>());
               auto thisBucketsMinPnGlobal = thisBucketsMinPnLocal;
               if(equalRange.first == begin)
               {
                 thisBucketsMinPnGlobal =  comm.rank() == 0 ?  thisBucketsMinPnLocal : 
-                  TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
+                  conn::utils::TpleReduce2Layers<cclTupleIds::Pc, cclTupleIds::Pn, std::greater, std::less>() (prevMinPn, thisBucketsMinPnLocal);
 
               }
     
@@ -540,11 +539,11 @@ namespace conn
         void computeComponentCount()
         {
           //Vector should be sorted by Pc
-          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm))
-            mxx::sort(tupleVector.begin(), tupleVector.end(), TpleComp<cclTupleIds::Pc>(), comm);
+          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm))
+            mxx::sort(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm);
 
           //Count unique Pc values
-          componentCount =  mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  TpleComp<cclTupleIds::Pc>(), comm);
+          componentCount =  mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  conn::utils::TpleComp<cclTupleIds::Pc>(), comm);
         }
 
         /**

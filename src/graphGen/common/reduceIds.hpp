@@ -72,32 +72,6 @@ namespace conn
       };
 
     /**
-     * @brief             Edge comparator
-     * @param[in] layer   0 or 1 depending upon using the 
-     *                    source or dest layer of edge
-     */
-    template <uint8_t layer>
-      struct edgeComparator
-      {
-        //Compare 2 edges
-        template <typename E>
-          bool operator() (const std::pair<E,E>& e1, const std::pair<E,E>& e2){
-            return std::get<layer>(e1) < std::get<layer>(e2);
-          }
-
-        //Compare edge and vertex
-        template <typename E>
-          bool operator() (const std::pair<E,E>& e, const E& v1){
-            return std::get<layer>(e) < v1;
-          }
-
-        template <typename E>
-          bool operator() (const E& v1, const std::pair<E,E>& e){
-            return v1 < std::get<layer>(e);
-          }
-      };
-
-    /**
      * @brief                         Given a graph as list of edges, it updates all the vertex ids so
      *                                that they are contiguos from 0 to |V-1|
      * @param[in]  edgeList           distributed vector of edges
@@ -142,8 +116,7 @@ namespace conn
         //Update the DEST layer of all the edges
         {
           //Globally sort all the edges by DEST layer
-          edgeComparator<DEST> cmp;
-          mxx::sort(edgeList.begin(), edgeList.end(), cmp);
+          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<DEST>());
 
           auto allSplitters = mxx::allgather(std::get<DEST>(edgeList.front()));
           allSplitters.erase(allSplitters.begin()); //Discard element that came from rank 0
@@ -167,7 +140,7 @@ namespace conn
           for(auto it = edgeList.begin(); it != edgeList.end();)
           {
             //Edges whose dest element are equal
-            auto edgeListRange = conn::utils::findRange(it, edgeList.end(), *it, cmp); 
+            auto edgeListRange = conn::utils::findRange(it, edgeList.end(), *it, conn::utils::TpleComp<DEST>()); 
 
             //Iterator in uniqueVertexList pointing to value equal to dest
             auto srcMatch = std::find(it2, uniqueVertexList.end(), std::get<DEST>(*it));
@@ -189,8 +162,7 @@ namespace conn
         //Update the SRC layer of all the edges
         {
           //Globally sort all the edges by SRC layer
-          edgeComparator<SRC> cmp;
-          mxx::sort(edgeList.begin(), edgeList.end(), cmp);
+          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>());
 
           auto allSplitters = mxx::allgather(std::get<SRC>(edgeList.front()));
           allSplitters.erase(allSplitters.begin()); //Discard element that came from rank 0
@@ -214,7 +186,7 @@ namespace conn
           for(auto it = edgeList.begin(); it != edgeList.end();)
           {
             //Edges whose src element are equal
-            auto edgeListRange = conn::utils::findRange(it, edgeList.end(), *it, cmp); 
+            auto edgeListRange = conn::utils::findRange(it, edgeList.end(), *it, conn::utils::TpleComp<SRC>()); 
 
             //Iterator in uniqueVertexList pointing to value equal to src
             auto srcMatch = std::find(it2, uniqueVertexList.end(), std::get<SRC>(*it));
