@@ -273,26 +273,32 @@ namespace conn
             //Local sort
             std::sort(unVisitedVerticesArray.begin(), unVisitedVerticesArray.end());
 
-            //To resolve the boundary splits across edgelist, we need to do a left shift of first element
-            //of this array from ranks 1.. p-1
-            E nextProcsFirstUnvisitedVertex = mxx::left_shift(unVisitedVerticesArray.front(), comm);
+            //Do the filtering among the subset of ranks which have non-zero unvisited elements
+            //This is required in the cases where BFS traverses all or almost all the edges
+            comm.with_subset(unVisitedVerticesArray.size() > 0, [&](const mxx::comm& comm){
 
-            //ranks 0.. p-2
-            if(comm.rank() < comm.size() - 1)
-              unVisitedVerticesArray.push_back(nextProcsFirstUnvisitedVertex);
+                //To resolve the boundary splits across edgelist, we need to do a left shift of first element
+                //of this array from ranks 1.. p-1
+                E nextProcsFirstUnvisitedVertex = mxx::left_shift(unVisitedVerticesArray.front(), comm);
 
-            //Start traversal over vertex array
-            auto it2 = edgeList.begin();
-            for(auto it = unVisitedVerticesArray.begin(); it != unVisitedVerticesArray.end(); it++)
-            {
-              //Edges whose SRC element equals the unvisited vertex element
-              auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, conn::utils::TpleComp<SRC>()); 
+                //ranks 0.. p-2
+                if(comm.rank() < comm.size() - 1)
+                  unVisitedVerticesArray.push_back(nextProcsFirstUnvisitedVertex);
 
-              //Insert these edges to our new edgeList
-              edgeListNew.insert(edgeListNew.end(), edgeListRange.first, edgeListRange.second);
+                //Start traversal over vertex array
+                auto it2 = edgeList.begin();
+                for(auto it = unVisitedVerticesArray.begin(); it != unVisitedVerticesArray.end(); it++)
+                {
+                  //Edges whose SRC element equals the unvisited vertex element
+                  auto edgeListRange = conn::utils::findRange(it2, edgeList.end(), *it, conn::utils::TpleComp<SRC>()); 
 
-              it2 = edgeListRange.second;
-            }
+                  //Insert these edges to our new edgeList
+                  edgeListNew.insert(edgeListNew.end(), edgeListRange.first, edgeListRange.second);
+
+                  it2 = edgeListRange.second;
+                }
+            }); //End of lambda function
+
           }
 
           //Replace the content of edgeList with the unvisited edges

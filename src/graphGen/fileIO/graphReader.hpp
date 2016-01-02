@@ -2,7 +2,7 @@
  * @file    graphReader.hpp
  * @ingroup group
  * @author  Chirag Jain <cjain7@gatech.edu>
- * @brief   Parallel graph reader using MPI file IO
+ * @brief   Parallel graph reader using BLISS parallel IO support
  *
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */

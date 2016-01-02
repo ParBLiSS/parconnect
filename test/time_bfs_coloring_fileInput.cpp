@@ -140,13 +140,16 @@ int main(int argc, char** argv)
   auto totalEdgeCount = mxx::reduce(edgeList.size(), 0, comm);
   LOG_IF(!comm.rank(), INFO) << "Total edge count remaining after BFS : " << totalEdgeCount;
 
-
   {
     mxx::section_timer timer(std::cerr, comm);
 
-    //Compute connected components
-    conn::coloring::ccl<vertexIdType> cclInstance(edgeList, comm);
-    cclInstance.compute();
+    //Compute connected components using coloring for the remaining graph
+    //Among the subset of ranks which have non-zero count of edges
+
+    comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
+        conn::coloring::ccl<vertexIdType> cclInstance(edgeList, comm);
+        cclInstance.compute();
+    });
 
     timer.end_section("Coloring completed");
   }
