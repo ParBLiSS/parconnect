@@ -30,6 +30,8 @@ namespace conn
     /**
      * @class                     conn::graphGen::deBruijnGraph
      * @brief                     Builds the edgelist of de Bruijn graph 
+     * @details                   Sequences are expected in the FASTQ format
+     *                            Restrict the alphabets of DNA to {A,C,G,T} 
      */
     class deBruijnGraph
     {
@@ -44,7 +46,7 @@ namespace conn
         template <typename EdgeEnc>
           using NodeMapType = typename bliss::de_bruijn::de_bruijn_nodes_distributed<
           KmerType, bliss::de_bruijn::node::edge_exists<EdgeEnc>, int,
-          bliss::kmer::transform::lex_less,
+          bliss::kmer::transform::identity,
           bliss::kmer::hash::farm>;
 
 
@@ -84,6 +86,10 @@ namespace conn
           std::vector<kmerType> tmpNeighborVector1;
           std::vector<kmerType> tmpNeighborVector2;
 
+          bliss::kmer::transform::lex_less<KmerType> minKmer;
+
+          static_assert(std::is_same<typename kmerType::KmerWordType, uint64_t>::value, "Kmer word type should be set to uint64_t");
+
           //Read the index and populate the edges inside edgeList
           for(; it != idx.cend(); it++)
           {
@@ -95,26 +101,22 @@ namespace conn
             //Get outgoing neigbors
             bliss::de_bruijn::node::node_utils<kmerType, edgeCountInfoType>::get_out_neighbors(sourceKmer, it->second, tmpNeighborVector2);
 
+            //typename kmerType::KmerWordType* sourceVertexData = minKmer(sourceKmer).getData();
+            size_t s = minKmer(sourceKmer).getData()[0];
+
             //Push the edges to our edgeList
             for(auto &e : tmpNeighborVector1)
             {
-              static_assert(std::is_same<typename kmerType::KmerWordType, uint64_t>::value, "Kmer word type should be set to uint64_t");
 
-              //Get word data of the canonical form of kmers
-              const typename kmerType::KmerWordType* sourceVertexData = std::min(sourceKmer, sourceKmer.reverse_complement()).getData();
-              const typename kmerType::KmerWordType* destVertexData = std::min(e, e.reverse_complement()).getData();
-
-              //Push the edge in our data structure
-              edgeList.emplace_back(sourceVertexData[0], destVertexData[0]);
+              size_t d = minKmer(e).getData()[0];
+              edgeList.emplace_back(s, d);
             }
 
             //Same procedure for the outgoing edges
             for(auto &e : tmpNeighborVector2)
             {
-              const typename kmerType::KmerWordType* sourceVertexData = std::min(sourceKmer, sourceKmer.reverse_complement()).getData();
-              const typename kmerType::KmerWordType* destVertexData = std::min(e, e.reverse_complement()).getData();
-
-              edgeList.emplace_back(sourceVertexData[0], destVertexData[0]);
+              size_t d = minKmer(e).getData()[0];
+              edgeList.emplace_back(s, d);
             }
           }
 
