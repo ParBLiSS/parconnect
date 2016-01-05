@@ -94,13 +94,17 @@ namespace conn
 
           adjustInitialIterPosition(dataIter, partition.end(), i);
 
+          //Backup iterators and offset for back-tracking
           typename FileLoaderType::L1BlockType::iterator backUpdataIter;
+          std::size_t backupi;
+
           bool lastEdgeRead;
 
           //Begin parsing the contents 
           while (dataIter != partition.end()) {
 
             backUpdataIter = dataIter;
+            backupi = i;
             lastEdgeRead = readAnEdge(dataIter, partition.end(), i);
 
           }
@@ -111,13 +115,13 @@ namespace conn
             if(lastEdgeRead == true)
             {
               //Read edge from next record
-              this->findNonEOL(dataIter, partition.begin() , i);
+              this->findNonEOL(dataIter, dataIter + std::min(loader.getFileRange().end - i, localFileRange.end - localFileRange.start), i);
               readAnEdge(dataIter, partition.begin(), i);
             }
             else
             {
               //Read full record again
-              readAnEdge(backUpdataIter, partition.begin(), i);
+              readAnEdge(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start) , backupi);
             }
           }
 
