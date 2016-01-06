@@ -15,6 +15,7 @@
 
 //Own includes
 #include "graphGen/common/timer.hpp"
+#include "utils/logging.hpp"
 
 //External includes
 #include "io/file_loader.hpp"
@@ -120,6 +121,8 @@ namespace conn
             }
             else
             {
+              this->findNonEOL(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start), backupi);
+              
               //Read full record again
               readAnEdge(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start) , backupi);
             }
@@ -189,7 +192,6 @@ namespace conn
 
             return true;
           }
-
 
         /**
          * @brief             assumes string with two integers as input,

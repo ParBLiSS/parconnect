@@ -13,9 +13,10 @@
 
 //Own includes
 #include "utils/logging.hpp"
-#include "utils/prettyprint.hpp"
+#include "utils/commonfuncs.hpp"
 #include "graphGen/common/reduceIds.hpp"
 #include "graphGen/graph500/graph500Gen.hpp"
+#include "graphGen/fileIO/graphReader.hpp"
 
 //External includes
 #include "gtest.h"
@@ -73,7 +74,7 @@ TEST(graphGen, reduceIdSmallGraph) {
 
 /**
  * @brief       Run graph500 generator and graph reducer
- *              Fetch the value of vertex count in the graph
+ *              Fetch the value of vertex count ie |V| in the graph
  *              Check all the vertex ids in the graph are less than above value
  */
 TEST(graphGen, reduceIdgraph500) {
@@ -117,3 +118,62 @@ TEST(graphGen, reduceIdgraph500) {
   ASSERT_TRUE(vertexIdCheck);
 }
 
+/*
+ * @brief   Test the correctness of parallel file io graph reader
+ *          Supply the file as input containing a graph of directed
+ *          chain {1-2-3...1201}
+ *          FILE : src/test/data/graphDirChain.txt
+ *          Read the graph and test the presence of all the edges we expect
+ */
+TEST(graphGen, graphFileIO) {
+
+  mxx::comm comm = mxx::comm();
+
+  //File name
+  //Make sure this path to file is correct 
+  std::string fileName = "/home/chirag/Documents/GRA/Connectivity/parconnect/test/data/graphDirChain.txt";
+
+  //Above graph is a directed chain, we need to include reverse own our own
+  bool addreverseEdgeWhileParsing = true;
+
+  using vertexIdType = int64_t;
+
+  std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;
+
+  {
+    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addreverseEdgeWhileParsing, comm);
+
+    g.populateEdgeList(fileName);
+  }
+
+  //Gather complete edgeList on rank 0
+  auto fullEdgeList = mxx::gatherv(edgeList, 0, comm);
+
+  if(!comm.rank())
+  {
+    const int SRC = 0, DEST = 1;
+    std::sort(fullEdgeList.begin(), fullEdgeList.end(), conn::utils::TpleComp2Layers<SRC, DEST>());
+
+    //Check for the presence of 1-2. 2-3, 3-4...1200-1201 at index 0, 2, ...
+    int j = 1;
+    for(int i = 0; i < fullEdgeList.size(); i += 2)
+    {
+      ASSERT_EQ(fullEdgeList[i].first, j);
+      ASSERT_EQ(fullEdgeList[i].second, j + 1);
+
+      j++;
+    }
+
+
+    //and then check for the presence of 2-1 3-2 ... 1201-1200 at index 1, 3 ...
+    j = 1;
+    for(int i = 1; i < fullEdgeList.size(); i += 2)
+    {
+      ASSERT_EQ(fullEdgeList[i].first, j + 1);
+      ASSERT_EQ(fullEdgeList[i].second, j);
+
+      j++;
+    }
+
+  }
+}
