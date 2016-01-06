@@ -154,6 +154,8 @@ TEST(graphGen, graphFileIO) {
     const int SRC = 0, DEST = 1;
     std::sort(fullEdgeList.begin(), fullEdgeList.end(), conn::utils::TpleComp2Layers<SRC, DEST>());
 
+    ASSERT_EQ(fullEdgeList.size(), 2400);
+
     //Check for the presence of 1-2. 2-3, 3-4...1200-1201 at index 0, 2, ...
     int j = 1;
     for(int i = 0; i < fullEdgeList.size(); i += 2)
