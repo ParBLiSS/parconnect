@@ -61,7 +61,10 @@ namespace conn
               const mxx::comm &comm) :  edgeList(edgeList), 
                                         addReverseEdge(addReverseEdge),
                                         comm(comm.copy())
-          {}
+          {
+            comm.barrier();
+            LOG_IF(!comm.rank(), INFO) << "GraphFileParser constructor called";
+          }
 
 
         /**
@@ -78,20 +81,36 @@ namespace conn
           //Define file loader type
           typedef bliss::io::FileLoader<IteratorValueType> FileLoaderType;  
 
+          comm.barrier();
+          LOG_IF(!comm.rank(), INFO) << "Defining loader";
+
           //==== create file Loader
           FileLoaderType loader(filename, comm);
+
+          comm.barrier();
+          LOG_IF(!comm.rank(), INFO) << "Fetching L1 block";
 
           //====  now process the file, one L1 block partition per MPI Rank 
           typename FileLoaderType::L1BlockType partition = loader.getNextL1Block();
 
+          LOG_IF(!comm.rank(), INFO) << "Global file range [" << loader.getFileRange().start << "," << loader.getFileRange().end << "]"; 
+
+          comm.barrier();
+          LOG_IF(!comm.rank(), INFO) << "Obtaining range";
+
           //Range of the file partition this MPI rank reads
           auto localFileRange = partition.getRange();
+
+          LOG(INFO) << "Rank " << comm.rank() << "'s local file range [" << localFileRange.start << "," << localFileRange.end << "]"; 
 
           //Iterator over data in the file
           typename FileLoaderType::L1BlockType::iterator dataIter = partition.begin();
 
           //Initialize the byte offset counter over the range of this rank
           std::size_t i = localFileRange.start;
+
+          comm.barrier();
+          LOG_IF(!comm.rank(), INFO) << "Adjusting begin iterator ";
 
           adjustInitialIterPosition(dataIter, partition.end(), i);
 
@@ -100,6 +119,9 @@ namespace conn
           std::size_t backupi;
 
           bool lastEdgeRead;
+
+          comm.barrier();
+          LOG_IF(!comm.rank(), INFO) << "Beginning parsing of the file ";
 
           //Begin parsing the contents 
           while (dataIter != partition.end()) {
@@ -110,23 +132,32 @@ namespace conn
 
           }
 
+          comm.barrier();
+          LOG_IF(!comm.rank(), INFO) << "Reading last edge";
+
+
           //All but last rank read one more edge
           if(comm.rank() != comm.size() - 1)
           {
             if(lastEdgeRead == true)
             {
               //Read edge from next record
+              LOG(INFO) << "Rank " << comm.rank() << " Current offset[t] " << i; 
               this->findNonEOL(dataIter, dataIter + std::min(loader.getFileRange().end - i, localFileRange.end - localFileRange.start), i);
-              readAnEdge(dataIter, partition.begin(), i);
+              readAnEdge(dataIter, dataIter + std::min(loader.getFileRange().end - i, localFileRange.end - localFileRange.start), i);
             }
             else
             {
               this->findNonEOL(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start), backupi);
               
               //Read full record again
+              LOG(INFO) << "Rank " << comm.rank() << " Current offset[f] " << backupi; 
+              this->findNonEOL(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start) , backupi);
               readAnEdge(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start) , backupi);
             }
           }
+
+          LOG(INFO) << "Rank " << comm.rank() << " read the last edge"; 
 
           timer.end_section("File IO completed, graph built");
         }
