@@ -61,10 +61,7 @@ namespace conn
               const mxx::comm &comm) :  edgeList(edgeList), 
                                         addReverseEdge(addReverseEdge),
                                         comm(comm.copy())
-          {
-            comm.barrier();
-            //LOG_IF(!comm.rank(), INFO) << "GraphFileParser constructor called";
-          }
+          {}
 
 
         /**
@@ -81,36 +78,20 @@ namespace conn
           //Define file loader type
           typedef bliss::io::FileLoader<IteratorValueType> FileLoaderType;  
 
-          comm.barrier();
-          //LOG_IF(!comm.rank(), INFO) << "Defining loader";
-
           //==== create file Loader
           FileLoaderType loader(filename, comm);
-
-          comm.barrier();
-          //LOG_IF(!comm.rank(), INFO) << "Fetching L1 block";
 
           //====  now process the file, one L1 block partition per MPI Rank 
           typename FileLoaderType::L1BlockType partition = loader.getNextL1Block();
 
-          //LOG_IF(!comm.rank(), INFO) << "Global file range [" << loader.getFileRange().start << "," << loader.getFileRange().end << "]"; 
-
-          comm.barrier();
-          //LOG_IF(!comm.rank(), INFO) << "Obtaining range";
-
           //Range of the file partition this MPI rank reads
           auto localFileRange = partition.getRange();
-
-          //LOG(INFO) << "Rank " << comm.rank() << "'s local file range [" << localFileRange.start << "," << localFileRange.end << "]"; 
 
           //Iterator over data in the file
           typename FileLoaderType::L1BlockType::iterator dataIter = partition.begin();
 
           //Initialize the byte offset counter over the range of this rank
           std::size_t i = localFileRange.start;
-
-          comm.barrier();
-          //LOG_IF(!comm.rank(), INFO) << "Adjusting begin iterator ";
 
           adjustInitialIterPosition(dataIter, partition.end(), i);
 
@@ -119,9 +100,6 @@ namespace conn
           std::size_t backupi;
 
           bool lastEdgeRead = true;
-
-          comm.barrier();
-          //LOG_IF(!comm.rank(), INFO) << "Beginning parsing of the file ";
 
           //Begin parsing the contents 
           //lastEdgeRead will be false when we reach the partition end boundary
@@ -132,23 +110,14 @@ namespace conn
             lastEdgeRead = readAnEdge(dataIter, partition.end(), i);
           }
 
-          comm.barrier();
-          LOG_IF(!comm.rank(), INFO) << "Reading last edge";
-
           //All but last rank read one more edge
           if(comm.rank() != comm.size() - 1)
           {
-            //LOG(INFO) << "Rank<b> " << comm.rank() << " Current offset " << backupi; 
-
             this->findNonEOL(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start), backupi);
-
-            //LOG(INFO) << "Rank<a> " << comm.rank() << " Current offset " << backupi; 
 
             //Read full record again (this will be the record to which my partition.end points to)
             readAnEdge(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start) , backupi);
           }
-
-          //LOG(INFO) << "Rank " << comm.rank() << " read the last edge"; 
 
           timer.end_section("File IO completed, graph built");
         }
@@ -156,7 +125,7 @@ namespace conn
       private:
 
         template <typename Iter>
-          void adjustInitialIterPosition(Iter& curr, Iter end, std::size_t& i)
+          void adjustInitialIterPosition(Iter& curr, const Iter& end, std::size_t& i)
           {
             //every rank except 0 skips initial partial or full record
             if(comm.rank() != 0)
@@ -166,13 +135,16 @@ namespace conn
             }
 
             //skip initial sentences beginning with '%'
-            while(*curr == '%')
+            //There is an assumption here that comments 
+            //are very few and will fall in rank 0's partition
+            if(comm.rank() == 0)
             {
-              if(curr == end)
-                return;
-
-              this->findEOL(curr, end, i);
-              this->findNonEOL(curr, end, i);
+              //Jump to next line if we see a comment
+              while(*curr == '%')
+              {
+                this->findEOL(curr, end, i);
+                this->findNonEOL(curr, end, i);
+              }
             }
           }
 
@@ -184,7 +156,7 @@ namespace conn
          *                    false if partition boundary is encountered 
          */
         template <typename Iter>
-          bool readAnEdge(Iter& curr, Iter end, std::size_t& offset) 
+          bool readAnEdge(Iter& curr, const Iter &end, std::size_t& offset) 
           {
             //make sure we point to non EOL value
             this->findNonEOL(curr, end, offset);
@@ -219,7 +191,7 @@ namespace conn
          * @brief             assumes string with two integers as input,
          *                    parse the integers and insert to edgeList
          * @param[in] record  string with 2 integers separated by space
-         */
+         */                    
         inline void parseStringForEdge(std::string &record)
         {
           std::stringstream stream(record);
