@@ -100,6 +100,9 @@ int main(int argc, char** argv)
     cclInstance.compute();
 
     timer.end_section("Coloring completed");
+
+    auto countComponents = cclInstance.computeComponentCount();
+    LOG_IF(!comm.rank(), INFO) << "Count of components -> " << countComponents;
   }
 
   MPI_Finalize();

@@ -145,6 +145,9 @@ int main(int argc, char** argv)
     comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
         conn::coloring::ccl<vertexIdType> cclInstance(edgeList, comm);
         cclInstance.compute();
+
+        auto countComponents = cclInstance.computeComponentCount();
+        LOG_IF(!comm.rank(), INFO) << "Count of components -> " << countComponents;
     });
 
     timer.end_section("Coloring completed");
