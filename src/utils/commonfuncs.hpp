@@ -12,6 +12,10 @@
 
 //Includes
 #include <iostream>
+#include <fstream>
+
+//External includes
+#include "mxx/comm.hpp"
 
 
 namespace conn 
@@ -141,7 +145,27 @@ namespace conn
           }
       };
 
+    //Write all the edges to a single file
+    //Could be slow since it writes sequentially
+    template <typename EdgeVectorType>
+      void writeEdgesToFile(EdgeVectorType &edges, std::string &outFile, const mxx::comm &comm)
+      {
+        //Gather complete edgeList on rank 0
+        auto fullEdgeList = mxx::gatherv(edges, 0, comm);
 
+        if(!comm.rank())
+        {
+
+          std::ofstream f;
+          f.open(outFile);
+
+          for(auto &e : fullEdgeList)
+            f << e.first << " " << e.second << std::endl;
+
+          f.close();
+
+        }
+      }
   }
 }
 

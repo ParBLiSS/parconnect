@@ -34,6 +34,9 @@ target_link_libraries(time_bfs_coloring_debruijn_graph ${EXTRA_LIBS} MPITypelib 
 add_executable(time_bfs_coloring_fileInput time_bfs_coloring_fileInput.cpp)
 target_link_libraries(time_bfs_coloring_fileInput ${EXTRA_LIBS} MPITypelib CommGridlib)
 
+add_executable(time_ccl_coloring_fileInput time_ccl_coloring_fileInput.cpp)
+target_link_libraries(time_ccl_coloring_fileInput ${EXTRA_LIBS})
+
 #################
 ## CORRECTNESS ##
 #################

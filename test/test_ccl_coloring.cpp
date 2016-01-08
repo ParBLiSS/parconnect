@@ -47,7 +47,7 @@ TEST(connColoring, smallUndirectedChain) {
   std::random_shuffle(edgeList.begin(), edgeList.end());
   conn::coloring::ccl<nodeIdType> cclInstance(edgeList, c);
   cclInstance.compute();
-  auto component_count = cclInstance.getComponentCount();
+  auto component_count = cclInstance.computeComponentCount();
   ASSERT_EQ(1, component_count);
 }
 
@@ -116,7 +116,7 @@ TEST(connColoring, smallUndirected) {
   c.with_subset(c.rank() < 4, [&](const mxx::comm& comm){
       conn::coloring::ccl<nodeIdType> cclInstance(edgeList, comm);
       cclInstance.compute();
-      auto component_count = cclInstance.getComponentCount();
+      auto component_count = cclInstance.computeComponentCount();
       ASSERT_EQ(3, component_count);
       });
 }
@@ -181,7 +181,7 @@ TEST(connColoring, mediumUndirected) {
   std::random_shuffle(edgeList.begin(), edgeList.end());
   conn::coloring::ccl<> cclInstance(edgeList, c);
   cclInstance.compute();
-  auto component_count = cclInstance.getComponentCount();
+  auto component_count = cclInstance.computeComponentCount();
   ASSERT_EQ(3, component_count);
 }
 
