@@ -102,20 +102,20 @@ namespace conn
             bliss::de_bruijn::node::node_utils<kmerType, edgeCountInfoType>::get_out_neighbors(sourceKmer, it->second, tmpNeighborVector2);
 
             //typename kmerType::KmerWordType* sourceVertexData = minKmer(sourceKmer).getData();
-            size_t s = minKmer(sourceKmer).getData()[0];
+            auto s = minKmer(sourceKmer).getData()[0];
 
             //Push the edges to our edgeList
             for(auto &e : tmpNeighborVector1)
             {
 
-              size_t d = minKmer(e).getData()[0];
+              auto d = minKmer(e).getData()[0];
               edgeList.emplace_back(s, d);
             }
 
             //Same procedure for the outgoing edges
             for(auto &e : tmpNeighborVector2)
             {
-              size_t d = minKmer(e).getData()[0];
+              auto d = minKmer(e).getData()[0];
               edgeList.emplace_back(s, d);
             }
           }
