@@ -46,7 +46,7 @@ namespace conn
         template <typename EdgeEnc>
           using NodeMapType = typename bliss::de_bruijn::de_bruijn_nodes_distributed<
           KmerType, bliss::de_bruijn::node::edge_exists<EdgeEnc>, int,
-          bliss::kmer::transform::identity,
+          bliss::kmer::transform::lex_less,
           bliss::kmer::hash::farm>;
 
 
