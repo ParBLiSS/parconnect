@@ -46,12 +46,14 @@ namespace conn
           Iterator curr(_data);
           Iterator end(_data);
 
-          std::size_t i = searchRange.start;
+          RangeType r = RangeType::intersect(inMemRange, searchRange);
 
-          std::advance(end, searchRange.end - searchRange.start);
+          std::size_t i = r.start;
+
+          std::advance(end, r.end - r.start);
 
           //every rank except 0 skips initial partial or full record
-          if(searchRange.start == parentRange.start)
+          if(r.start != parentRange.start)
           {
             this->findEOL(curr, end, i);
             this->findNonEOL(curr, end, i);
@@ -60,7 +62,7 @@ namespace conn
           //skip initial sentences beginning with '%'
           //There is an assumption here that comments 
           //are very few and will fall in rank 0's partition
-          if(searchRange.start != parentRange.start)
+          if(r.start == parentRange.start)
           {
             //Jump to next line if we see a comment
             while(*curr == '%')
@@ -69,6 +71,8 @@ namespace conn
               this->findNonEOL(curr, end, i);
             }
           }
+
+          return i;
         }
 
 
