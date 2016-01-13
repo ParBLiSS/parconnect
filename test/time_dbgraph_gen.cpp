@@ -14,10 +14,10 @@
 //Own includes
 #include "graphGen/deBruijn/deBruijnGraphGen.hpp"
 #include "graphGen/common/utils.hpp"
-#include "utils/logging.hpp"
-#include "utils/argvparser.hpp"
 
 //External includes
+#include "extutils/logging.hpp"
+#include "extutils/argvparser.hpp"
 #include "mxx/reduction.hpp"
 #include "mxx/utils.hpp"
 #include "debruijn/de_bruijn_construct_engine.hpp"

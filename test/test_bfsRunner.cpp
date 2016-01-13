@@ -12,7 +12,6 @@
 
 //Own includes
 #include "bfs/bfsRunner.hpp"
-#include "utils/prettyprint.hpp"
 
 //External includes
 #include "gtest.h"

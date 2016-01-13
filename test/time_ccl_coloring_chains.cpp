@@ -13,10 +13,10 @@
 //Own includes
 #include "graphGen/undirectedChain/undirectedChainGen.hpp"
 #include "coloring/labelProp.hpp"
-#include "utils/logging.hpp"
-#include "utils/argvparser.hpp"
 
 //External includes
+#include "extutils/logging.hpp"
+#include "extutils/argvparser.hpp"
 #include "mxx/reduction.hpp"
 #include "mxx/utils.hpp"
 

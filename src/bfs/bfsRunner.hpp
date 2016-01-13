@@ -15,12 +15,12 @@
 #include <unordered_set>
 
 //Own includes
-#include "utils/logging.hpp"
-#include "utils/commonfuncs.hpp"
 #include "graphGen/common/reduceIds.hpp"
 #include "bfs/timer.hpp"
+#include "utils/commonfuncs.hpp"
 
 //External includes
+#include "extutils/logging.hpp"
 #include "graph500-gen/make_graph.h"
 #include "CombBLAS/CombBLAS.h"
 #include "mxx/comm.hpp"

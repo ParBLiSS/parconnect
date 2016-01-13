@@ -11,10 +11,10 @@
 #define GRAPH_UTILS_HPP
 
 //Own inlcudes
-#include "utils/logging.hpp"
 #include "utils/commonfuncs.hpp"
 
 //external includes
+#include "extutils/logging.hpp"
 #include "mxx/reduction.hpp"
 #include "mxx/sort.hpp"
 

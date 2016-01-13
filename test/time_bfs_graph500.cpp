@@ -15,11 +15,11 @@
 #include "graphGen/graph500/graph500Gen.hpp"
 #include "graphGen/common/reduceIds.hpp"
 #include "bfs/bfsRunner.hpp"
-#include "utils/logging.hpp"
-#include "utils/prettyprint.hpp"
-#include "utils/argvparser.hpp"
 
 //External includes
+#include "extutils/logging.hpp"
+#include "extutils/prettyprint.hpp"
+#include "extutils/argvparser.hpp"
 #include "mxx/utils.hpp"
 #include "mxx/timer.hpp"
 

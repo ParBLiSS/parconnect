@@ -17,13 +17,13 @@
 #include "coloring/labelProp_utils.hpp"
 #include "coloring/timer.hpp" //Timer switch 
 #include "utils/commonfuncs.hpp"
-#include "utils/logging.hpp"
-#include "utils/prettyprint.hpp"
 
 //external includes
 #include "mxx/sort.hpp"
 #include "mxx_extra/sort.hpp"
 #include "mxx/comm.hpp"
+#include "extutils/logging.hpp"
+#include "extutils/prettyprint.hpp"
 
 namespace conn 
 {

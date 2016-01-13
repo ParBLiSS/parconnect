@@ -12,13 +12,13 @@
 #include <algorithm>
 
 //Own includes
-#include "utils/logging.hpp"
 #include "utils/commonfuncs.hpp"
 #include "graphGen/common/reduceIds.hpp"
 #include "graphGen/graph500/graph500Gen.hpp"
 #include "graphGen/fileIO/graphReader.hpp"
 
 //External includes
+#include "extutils/logging.hpp"
 #include "gtest.h"
 #include "mxx/comm.hpp"
 

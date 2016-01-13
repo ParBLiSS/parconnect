@@ -15,10 +15,10 @@
 //Own includes
 #include "graphGen/fileIO/graphReader.hpp"
 #include "graphGen/common/utils.hpp"
-#include "utils/logging.hpp"
-#include "utils/argvparser.hpp"
 
 //External includes
+#include "extutils/logging.hpp"
+#include "extutils/argvparser.hpp"
 #include "mxx/utils.hpp"
 
 INITIALIZE_EASYLOGGINGPP
