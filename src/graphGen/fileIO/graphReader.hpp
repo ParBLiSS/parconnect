@@ -28,12 +28,12 @@ namespace conn
   namespace graphGen
   {
 
-     /*
+    /*
      * @class     conn::graphGen::graphFileLoader
      * @brief     Enables parallel reading of the edgelist file
      */
     template<typename Iterator>
-    class GraphFileLoader : public bliss::io::BaseFileParser<Iterator >
+      class GraphFileLoader : public bliss::io::BaseFileParser<Iterator >
     {
       public:
 
@@ -50,20 +50,24 @@ namespace conn
 
           std::size_t i = r.start;
 
-          std::advance(end, r.end - r.start);
+          //curr is started at inMemRange by bliss, we need to move it to r.start
+          std::advance(curr, i - inMemRange.start);
+
+          //advance end by total size of inMemRange
+          std::advance(end, inMemRange.size());
 
           //every rank except 0 skips initial partial or full record
-          if(r.start != parentRange.start)
+          if(searchRange.start != parentRange.start)
           {
             this->findEOL(curr, end, i);
             this->findNonEOL(curr, end, i);
           }
-
-          //skip initial sentences beginning with '%'
-          //There is an assumption here that comments 
-          //are very few and will fall in rank 0's partition
-          if(r.start == parentRange.start)
+          else
           {
+            //skip initial sentences beginning with '%'
+            //There is an assumption here that comments 
+            //are very few and will fall in rank 0's partition
+
             //Jump to next line if we see a comment
             while(*curr == '%')
             {
@@ -75,17 +79,16 @@ namespace conn
           return i;
         }
 
+        /// initializes the parser.  overwriting the functions to do nothting but call the find_first_record
+        virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange, const mxx::comm& comm)
+        {
+          return find_first_record(_data, parentRange, inMemRange, searchRange);
+        };
 
-        /// initializes the parser.  only useful for FASTA parser for now.  Assumes searchRange do NOT overlap between processes.
-       virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange, const mxx::comm& comm)
-       {
-         return find_first_record(_data, parentRange, inMemRange, searchRange);
-       };
-
-       virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange)
-       {
-         return find_first_record(_data, parentRange, inMemRange, searchRange);
-       };
+        virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange)
+        {
+          return find_first_record(_data, parentRange, inMemRange, searchRange);
+        };
 
     };
 
@@ -95,7 +98,7 @@ namespace conn
      * @brief     Enables parallel reading of the edgelist file
      */
     template<typename Iterator, typename E>
-    class GraphFileParser : public bliss::io::BaseFileParser<Iterator > 
+      class GraphFileParser : public bliss::io::BaseFileParser<Iterator > 
     {
       private:
 
@@ -125,14 +128,13 @@ namespace conn
         template <typename vID>
           GraphFileParser(std::vector< std::pair<vID, vID> > &edgeList, bool addReverseEdge,
               std::string &filename, const mxx::comm &comm) 
-                                        : edgeList(edgeList), 
-                                          addReverseEdge(addReverseEdge),
-                                          filename(filename),
-                                          comm(comm.copy())
-          {
-            static_assert(std::is_same<E, vID>::value, "Edge vector type should match");
-          }
-
+          : edgeList(edgeList), 
+          addReverseEdge(addReverseEdge),
+          filename(filename),
+          comm(comm.copy())
+      {
+        static_assert(std::is_same<E, vID>::value, "Edge vector type should match");
+      }
 
         /**
          * @brief                   populates the edge list vector 
@@ -171,7 +173,7 @@ namespace conn
             lastEdgeRead = readAnEdge(dataIter, partition.end(), i);
           }
 
-         timer.end_section("File IO completed, graph built");
+          timer.end_section("File IO completed, graph built");
         }
 
         /**
