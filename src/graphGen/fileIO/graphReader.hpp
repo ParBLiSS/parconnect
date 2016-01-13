@@ -40,7 +40,7 @@ namespace conn
 
         //Adjust the file loader's range by informing it how 
         //to find the beginning of the first record
-        std::size_t find_first_record(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange)
+        virtual std::size_t find_first_record(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange)
         {
           Iterator curr(_data);
           Iterator end(_data);
@@ -77,18 +77,6 @@ namespace conn
 
           return i;
         }
-
-        /// initializes the parser.  overwriting the functions to do nothting but call the find_first_record
-        virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange, const mxx::comm& comm)
-        {
-          return find_first_record(_data, parentRange, inMemRange, searchRange);
-        };
-
-        virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange)
-        {
-          return find_first_record(_data, parentRange, inMemRange, searchRange);
-        };
-
     };
 
 
