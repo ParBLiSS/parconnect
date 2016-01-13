@@ -28,16 +28,74 @@ namespace conn
   namespace graphGen
   {
 
+     /*
+     * @class     conn::graphGen::graphFileLoader
+     * @brief     Enables parallel reading of the edgelist file
+     */
+    template<typename Iterator>
+    class GraphFileLoader : public bliss::io::BaseFileParser<Iterator >
+    {
+      public:
+
+        using RangeType = bliss::partition::range<size_t>;
+
+        //Adjust the file loader's range by informing it how 
+        //to find the beginning of the first record
+        std::size_t find_first_record(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange)
+        {
+          Iterator curr(_data);
+          Iterator end(_data);
+
+          std::size_t i = searchRange.start;
+
+          std::advance(end, searchRange.end - searchRange.start);
+
+          //every rank except 0 skips initial partial or full record
+          if(searchRange.start == parentRange.start)
+          {
+            this->findEOL(curr, end, i);
+            this->findNonEOL(curr, end, i);
+          }
+
+          //skip initial sentences beginning with '%'
+          //There is an assumption here that comments 
+          //are very few and will fall in rank 0's partition
+          if(searchRange.start != parentRange.start)
+          {
+            //Jump to next line if we see a comment
+            while(*curr == '%')
+            {
+              this->findEOL(curr, end, i);
+              this->findNonEOL(curr, end, i);
+            }
+          }
+        }
+
+
+        /// initializes the parser.  only useful for FASTA parser for now.  Assumes searchRange do NOT overlap between processes.
+       virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange, const mxx::comm& comm)
+       {
+         return find_first_record(_data, parentRange, inMemRange, searchRange);
+       };
+
+       virtual std::size_t init_parser(const Iterator &_data, const RangeType &parentRange, const RangeType &inMemRange, const RangeType &searchRange)
+       {
+         return find_first_record(_data, parentRange, inMemRange, searchRange);
+       };
+
+    };
+
+
     /**
-     * @class     conn::graphGen::graphFileParser
+     * @class     conn::graphGen::GraphFileParser
      * @brief     Enables parallel reading of the edgelist file
      */
     template<typename Iterator, typename E>
-    class GraphFileParser : public bliss::io::BaseFileParser<Iterator >
+    class GraphFileParser : public bliss::io::BaseFileParser<Iterator > 
     {
       private:
 
-        //Type of inherited class
+        //Type of base class
         using baseType = typename bliss::io::BaseFileParser<Iterator >;
 
         //MPI communicator
@@ -49,6 +107,10 @@ namespace conn
         //Reference to the distributed edge list 
         std::vector< std::pair<E,E> > &edgeList;
 
+        const static int OVERLAP = 50;
+
+        std::string &filename;
+
       public:
 
         /**
@@ -58,17 +120,21 @@ namespace conn
          */
         template <typename vID>
           GraphFileParser(std::vector< std::pair<vID, vID> > &edgeList, bool addReverseEdge,
-              const mxx::comm &comm) :  edgeList(edgeList), 
-                                        addReverseEdge(addReverseEdge),
-                                        comm(comm.copy())
-          {}
+              std::string &filename, const mxx::comm &comm) 
+                                        : edgeList(edgeList), 
+                                          addReverseEdge(addReverseEdge),
+                                          filename(filename),
+                                          comm(comm.copy())
+          {
+            static_assert(std::is_same<E, vID>::value, "Edge vector type should match");
+          }
 
 
         /**
          * @brief                   populates the edge list vector 
          * @param[in]   filename    name of the file to read
          */
-        void populateEdgeList(std::string &filename)
+        void populateEdgeList()
         {
           Timer timer;
 
@@ -76,9 +142,8 @@ namespace conn
           typedef typename std::iterator_traits<Iterator>::value_type IteratorValueType;
 
           //Define file loader type
-          typedef bliss::io::FileLoader<IteratorValueType> FileLoaderType;  
+          typedef bliss::io::FileLoader<IteratorValueType, OVERLAP, GraphFileLoader > FileLoaderType;
 
-          //==== create file Loader
           FileLoaderType loader(filename, comm);
 
           //====  now process the file, one L1 block partition per MPI Rank 
@@ -93,60 +158,17 @@ namespace conn
           //Initialize the byte offset counter over the range of this rank
           std::size_t i = localFileRange.start;
 
-          adjustInitialIterPosition(dataIter, partition.end(), i);
-
-          //Backup iterators and offset for back-tracking
-          typename FileLoaderType::L1BlockType::iterator backUpdataIter;
-          std::size_t backupi;
-
           bool lastEdgeRead = true;
 
           //Begin parsing the contents 
           //lastEdgeRead will be false when we reach the partition end boundary
           while (lastEdgeRead) {
 
-            backUpdataIter = dataIter;
-            backupi = i;
             lastEdgeRead = readAnEdge(dataIter, partition.end(), i);
           }
 
-          //All but last rank read one more edge
-          if(comm.rank() != comm.size() - 1)
-          {
-            this->findNonEOL(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start), backupi);
-
-            //Read full record again (this will be the record to which my partition.end points to)
-            readAnEdge(backUpdataIter, backUpdataIter + std::min(loader.getFileRange().end - backupi, localFileRange.end - localFileRange.start) , backupi);
-          }
-
-          timer.end_section("File IO completed, graph built");
+         timer.end_section("File IO completed, graph built");
         }
-
-      private:
-
-        template <typename Iter>
-          void adjustInitialIterPosition(Iter& curr, const Iter& end, std::size_t& i)
-          {
-            //every rank except 0 skips initial partial or full record
-            if(comm.rank() != 0)
-            {
-              this->findEOL(curr, end, i);
-              this->findNonEOL(curr, end, i);
-            }
-
-            //skip initial sentences beginning with '%'
-            //There is an assumption here that comments 
-            //are very few and will fall in rank 0's partition
-            if(comm.rank() == 0)
-            {
-              //Jump to next line if we see a comment
-              while(*curr == '%')
-              {
-                this->findEOL(curr, end, i);
-                this->findNonEOL(curr, end, i);
-              }
-            }
-          }
 
         /**
          * @brief             reads an edge assuming iterator points to 
@@ -210,6 +232,7 @@ namespace conn
               edgeList.emplace_back(vertex2, vertex1);
           }
         }
+
     };
   }
 }

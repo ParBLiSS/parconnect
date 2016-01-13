@@ -71,9 +71,9 @@ int main(int argc, char** argv)
   std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;
 
   {
-    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addReverse, comm);
+    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addReverse, fileName, comm);
 
-    g.populateEdgeList(fileName);
+    g.populateEdgeList();
   }
 
   //Sum up the edge count across ranks

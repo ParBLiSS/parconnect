@@ -84,10 +84,10 @@ int main(int argc, char** argv)
     mxx::section_timer timer(std::cerr, comm);
 
     //Object of the graph generator class
-    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addReverse, comm);
+    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addReverse, fileName, comm);
 
     //Populate the edgeList
-    g.populateEdgeList(fileName);
+    g.populateEdgeList();
 
     timer.end_section("Graph generation completed");
   }

@@ -141,9 +141,9 @@ TEST(graphGen, graphFileIO) {
   std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;
 
   {
-    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addreverseEdgeWhileParsing, comm);
+    conn::graphGen::GraphFileParser<char *, vertexIdType> g(edgeList, addreverseEdgeWhileParsing, fileName, comm);
 
-    g.populateEdgeList(fileName);
+    g.populateEdgeList();
   }
 
   //Gather complete edgeList on rank 0
