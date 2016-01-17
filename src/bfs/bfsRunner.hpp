@@ -320,8 +320,11 @@ namespace conn
           //Replace the content of edgeList with the unvisited edges
           edgeList.assign(edgeListNew.begin(), edgeListNew.end());
 
-          //Ensure the block decomposition of edgeList
-          mxx::distribute_inplace(edgeList, comm);
+            comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
+            //Ensure the block decomposition of edgeList
+            mxx::distribute_inplace(edgeList, comm);
+          });
+
         }
 
         private:
