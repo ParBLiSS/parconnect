@@ -123,12 +123,19 @@ namespace conn
          */
         std::size_t computeComponentCount()
         {
-          //Vector should be sorted by Pc
-          if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm))
-            mxx::sort(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm);
+          std::size_t componentCount;
 
-          //Count unique Pc values
-          std::size_t componentCount =  mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  conn::utils::TpleComp<cclTupleIds::Pc>(), comm);
+          //Vector should be sorted by Pc
+          comm.with_subset(tupleVector.begin() !=  tupleVector.end() , [&](const mxx::comm& comm){
+
+            if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm))
+              mxx::sort(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm);
+
+            //Count unique Pc values
+            componentCount =  mxx::uniqueCount(tupleVector.begin(), tupleVector.end(),  conn::utils::TpleComp<cclTupleIds::Pc>(), comm);
+          });
+
+          componentCount = mxx::allreduce(componentCount, mxx::max<std::size_t>(), comm);
 
           return componentCount;
         }
