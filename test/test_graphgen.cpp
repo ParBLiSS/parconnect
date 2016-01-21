@@ -38,6 +38,11 @@
 #include "gtest.h"
 #include "mxx/comm.hpp"
 
+//To get the path to src/test/data folder 
+#define QUOTE(name) #name
+#define STR(macro) QUOTE(macro)
+#define PROJECT_TEST_DATA_FOLDER STR(PROJECT_TEST_DATA_DIR)
+
 INITIALIZE_EASYLOGGINGPP
 
 /**
@@ -147,7 +152,8 @@ TEST(graphGen, graphFileIO) {
 
   //File name
   //Make sure this path to file is correct 
-  std::string fileName = "/home/chirag/Documents/GRA/Connectivity/parconnect/test/data/graphDirChain.txt";
+  std::string fileName = PROJECT_TEST_DATA_FOLDER;
+  fileName = fileName + "/graphDirChain.txt";
 
   //Above graph is a directed chain, we need to include reverse own our own
   bool addreverseEdgeWhileParsing = true;
