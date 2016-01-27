@@ -190,8 +190,6 @@ namespace conn
 
           //Log the total count of tuples 
           auto totalTupleCount = mxx::reduce(tupleVector.size(), 0, comm);
-
-          LOG_IF(comm.rank() == 0, INFO) << "Total tuple count is " << totalTupleCount;
         }
 
         /**
