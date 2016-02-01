@@ -3,4 +3,4 @@
 	url = https://github.com/patflick/mxx.git
 [submodule "ext/bliss"]
 	path = ext/bliss
-	url = git@bitbucket.org:AluruLab/bliss.git
+	url = https://github.com/ParBLiSS/kmerind.git

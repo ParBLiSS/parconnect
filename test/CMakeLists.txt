@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 2.6)
 # project settings
 project(parConnect-test)
 
+##### add definitions to find path to data files
+add_definitions( -DPROJECT_TEST_DATA_DIR=${PROJECT_SOURCE_DIR}/data)
+
 #################
 ## PERFORMANCE ##
 #################
