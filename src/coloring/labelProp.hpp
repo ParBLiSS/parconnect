@@ -58,8 +58,7 @@ namespace conn
     {
       public:
         //Type for saving parition ids
-        //Defaulted to uint32_t, assuming we will never have more than 4 Billion partitions in the graph
-        using pIdtype = uint32_t;
+        using pIdtype = uint64_t;
 
         //Type for saving node ids
         using nodeIdType = nIdType;
