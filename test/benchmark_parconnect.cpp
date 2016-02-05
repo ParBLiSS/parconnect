@@ -168,6 +168,11 @@ int main(int argc, char** argv)
    * COMPUTE CONNECTIVITY
    */
 
+  comm.barrier();
+  auto start = std::chrono::steady_clock::now();
+
+  LOG_IF(!comm.rank(), INFO) << "Beginning computation, benchmark timer started";
+
   //Call the graph reducer function
   conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
 
@@ -176,11 +181,6 @@ int main(int argc, char** argv)
   std::size_t nEdges = conn::graphGen::globalSizeOfVector(edgeList, comm);
 
   LOG_IF(!comm.rank(), INFO) << "Graph size : vertices -> " << nVertices << ", edges -> " << nEdges/2;
-
-  comm.barrier();
-  auto start = std::chrono::steady_clock::now();
-
-  LOG_IF(!comm.rank(), INFO) << "Beginning computation, timer started";
 
   //For saving the size of component discovered using BFS
   std::vector<std::size_t> componentCountsResult;
