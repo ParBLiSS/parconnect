@@ -58,7 +58,7 @@ namespace conn
     {
       public:
         //Type for saving parition ids
-        using pIdtype = uint64_t;
+        using pIdtype = nIdType;
 
         //Type for saving node ids
         using nodeIdType = nIdType;
@@ -175,9 +175,6 @@ namespace conn
             //Range would include atleast 1 element
             assert(std::distance(equalRange.first, equalRange.second) > 0);
 
-            //Insert the self loop
-            tupleVector.emplace_back(std::get<edgeListTIds::src>(*it), MAX_PID, std::get<edgeListTIds::src>(*it)); 
-
             //Insert other vertex members in this partition 
             for(auto it2 = equalRange.first; it2 != equalRange.second; it2++)
               tupleVector.emplace_back(std::get<edgeListTIds::src>(*it2), MAX_PID, std::get<edgeListTIds::dst>(*it2));;
@@ -247,6 +244,7 @@ namespace conn
 
               timer.end_section("\tPointer doubling done");
             }
+
 
 
             //IMPORTANT : iterators over tupleVector are invalid and need to be redefined
@@ -342,10 +340,13 @@ namespace conn
 
                 }
 
+                auto maxPcValue = std::get<cclTupleIds::Pc>(thisBucketsMaxPcGlobal);
+                auto minPcValue = std::min(std::get<cclTupleIds::Pc>(thisBucketsMinPcGlobal), std::get<cclTupleIds::nId>(*equalRange.first));
+
                 //If min Pc < max Pc for this bucket, update Pn or else mark them as stable
-                if(conn::utils::TpleComp<cclTupleIds::Pc>()(thisBucketsMinPcGlobal, thisBucketsMaxPcGlobal))
+                if(minPcValue < maxPcValue)
                   std::for_each(equalRange.first, equalRange.second, [&](T &e){
-                      std::get<cclTupleIds::Pn>(e) = std::get<cclTupleIds::Pc>(thisBucketsMinPcGlobal);
+                      std::get<cclTupleIds::Pn>(e) = minPcValue;
                       });
                 else
                   std::for_each(equalRange.first, equalRange.second, [&](T &e){

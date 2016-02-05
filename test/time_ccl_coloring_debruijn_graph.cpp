@@ -64,8 +64,6 @@ int main(int argc, char** argv)
   //Parse command line arguments
   ArgvParser cmd;
 
-  LOG_IF(!comm.rank(), INFO) << "Computing components for deBruijn graph using coloring";
-
   cmd.setIntroductoryDescription("Computing components for deBruijn graph using coloring");
   cmd.setHelpOption("h", "help", "Print this help page");
 

@@ -15,10 +15,10 @@
  */
 
 /**
- * @file    time_bfs_coloring.cpp
+ * @file    time_ccl_coloring.cpp
  * @ingroup 
  * @author  Chirag Jain <cjain7@gatech.edu>
- * @brief   Computes connected components in a graph given as a general file input 
+ * @brief   Computes connected components in a graph just using coloring 
  *
  * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
  */
@@ -31,9 +31,8 @@
 #include "graphGen/fileIO/graphReader.hpp"
 #include "graphGen/deBruijn/deBruijnGraphGen.hpp"
 #include "graphGen/graph500/graph500Gen.hpp"
-#include "graphGen/common/reduceIds.hpp"
 #include "coloring/labelProp.hpp"
-#include "bfs/bfsRunner.hpp"
+#include "graphGen/common/reduceIds.hpp"
 
 //External includes
 #include "extutils/logging.hpp"
@@ -60,12 +59,12 @@ int main(int argc, char** argv)
    * COMMAND LINE ARGUMENTS
    */
 
-  LOG_IF(!comm.rank(), INFO) << "Starting executable for benchmarking in the Student Cluster Competition";
+  LOG_IF(!comm.rank(), INFO) << "Computing connectivity using coloring";
 
   //Parse command line arguments
   ArgvParser cmd;
 
-  cmd.setIntroductoryDescription("Benchmark for computing connectivity in the Student Cluster Competition");
+  cmd.setIntroductoryDescription("Computes connectivity using coloring");
   cmd.setHelpOption("h", "help", "Print this help page");
 
   cmd.defineOption("input", "dbg or kronecker or generic", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
@@ -88,9 +87,6 @@ int main(int argc, char** argv)
 
   //Declare a edgeList vector to save edges
   std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;
-
-  //Initialize the distributed vector for saving unique vertices
-  std::vector<vertexIdType> uniqueVertexList;
 
   LOG_IF(!comm.rank(), INFO) << "Generating graph";
 
@@ -174,54 +170,22 @@ int main(int argc, char** argv)
    * COMPUTE CONNECTIVITY
    */
 
+  std::size_t nEdges = conn::graphGen::globalSizeOfVector(edgeList, comm);
+
+  LOG_IF(!comm.rank(), INFO) << "Graph size : edges -> " << nEdges/2;
+
   comm.barrier();
   auto start = std::chrono::steady_clock::now();
 
-  LOG_IF(!comm.rank(), INFO) << "Beginning computation, timer started";
+  LOG_IF(!comm.rank(), INFO) << "Beginning computation, benchmark timer started";
 
-  //Call the graph reducer function
-  conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
-
-  //Count of vertices, edges in the reduced graph
-  std::size_t nVertices = conn::graphGen::globalSizeOfVector(uniqueVertexList, comm);
-  std::size_t nEdges = conn::graphGen::globalSizeOfVector(edgeList, comm);
-
-  LOG_IF(!comm.rank(), INFO) << "Graph size : vertices -> " << nVertices << ", edges -> " << nEdges/2;
-
-  //For saving the size of component discovered using BFS
-  std::vector<std::size_t> componentCountsResult;
+  std::size_t countComponents;
 
   {
-    mxx::section_timer timer(std::cerr, comm);
+    conn::coloring::ccl<vertexIdType> cclInstance(edgeList, comm);
+    cclInstance.compute();
 
-    conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
-
-    //Run BFS once
-    bfsInstance.runBFSIterations(1, componentCountsResult); 
-
-    timer.end_section("BFS iteration completed");
-
-    //Get the remaining edgeList
-    bfsInstance.filterEdgeList();
-
-    timer.end_section("Edgelist filtered for coloring");
-  }
-
-  LOG_IF(!comm.rank(), INFO) << "Component size traversed by BFS : " << componentCountsResult[0];
-
-  std::size_t countComponents = 1;
-
-  {
-    mxx::section_timer timer(std::cerr, comm);
-
-    comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
-        conn::coloring::ccl<vertexIdType> cclInstance(edgeList, comm);
-        cclInstance.compute();
-
-        countComponents += cclInstance.computeComponentCount();
-    });
-
-    timer.end_section("Coloring completed");
+    countComponents = cclInstance.computeComponentCount();
   }
 
   LOG_IF(!comm.rank(), INFO) << "Count of components -> " << countComponents;
