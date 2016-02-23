@@ -71,6 +71,7 @@ int main(int argc, char** argv)
   cmd.defineOption("input", "dbg or kronecker or generic", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
   cmd.defineOption("file", "input file", ArgvParser::OptionRequiresValue);
   cmd.defineOption("scale", "scale of the graph", ArgvParser::OptionRequiresValue);
+  cmd.defineOption("bfsiter", "number of BFS iterations to execute at the start, default is 1", ArgvParser::OptionRequiresValue);
 
   int result = cmd.parse(argc, argv);
 
@@ -94,6 +95,13 @@ int main(int argc, char** argv)
 
   LOG_IF(!comm.rank(), INFO) << "Generating graph";
 
+  //Read number of bfs iterations
+  std::size_t bfsIterations = 1;  //Default
+
+  if(cmd.foundOption("bfsiter"))
+    bfsIterations = std::stoi(cmd.optionValue("bfsiter")); 
+
+  //Construct graph based on the given input mode
   if(cmd.optionValue("input") == "generic")
   {
     //Input file
@@ -174,7 +182,7 @@ int main(int argc, char** argv)
   LOG_IF(!comm.rank(), INFO) << "Beginning computation, benchmark timer started";
 
   //Call the graph reducer function
-  conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
+  if(bfsIterations > 0) conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
 
   //Count of vertices, edges in the reduced graph
   std::size_t nVertices = conn::graphGen::globalSizeOfVector(uniqueVertexList, comm);
@@ -185,17 +193,22 @@ int main(int argc, char** argv)
   //For saving the size of component discovered using BFS
   std::vector<std::size_t> componentCountsResult;
 
+  std::size_t noBFSIterationsExecuted = 0;
+
+  if(bfsIterations > 0)
   {
     conn::bfs::bfsSupport<vertexIdType> bfsInstance(edgeList, nVertices, comm);
 
     //Run BFS once
-    bfsInstance.runBFSIterations(1, componentCountsResult); 
+    noBFSIterationsExecuted = bfsInstance.runBFSIterations(bfsIterations, componentCountsResult); 
 
     //Get the remaining edgeList
     bfsInstance.filterEdgeList();
   }
 
-  std::size_t countComponents = 1;
+  std::size_t countComponents = noBFSIterationsExecuted;
+
+  LOG_IF(!comm.rank(), INFO) << noBFSIterationsExecuted << " BFS iterations executed";
 
   {
     comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
@@ -206,6 +219,7 @@ int main(int argc, char** argv)
     });
   }
 
+  countComponents = mxx::allreduce(countComponents, mxx::max<std::size_t>());
   LOG_IF(!comm.rank(), INFO) << "Count of components -> " << countComponents;
 
   comm.barrier();

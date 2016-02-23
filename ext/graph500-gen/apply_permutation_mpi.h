@@ -31,7 +31,7 @@
 
 /* Internal function to get various information about an uneven block
  * distribution of some data. */
-void gather_block_distribution_info(MPI_Comm comm, const int64_t local_perm_size, const int64_t global_perm_size, int64_t* perm_displs /* size = MPI comm size + 1 */, int** perm_owner_table_ptr /* malloc'ed in here */, int64_t** perm_owner_cutoff_ptr /* malloc'ed in here */, int* lg_minpermsize_ptr, int64_t* maxpermsize_ptr) {
+inline void gather_block_distribution_info(MPI_Comm comm, const int64_t local_perm_size, const int64_t global_perm_size, int64_t* perm_displs /* size = MPI comm size + 1 */, int** perm_owner_table_ptr /* malloc'ed in here */, int64_t** perm_owner_cutoff_ptr /* malloc'ed in here */, int* lg_minpermsize_ptr, int64_t* maxpermsize_ptr) {
   int rank, size;
 
   MPI_Comm_rank(comm, &rank);
@@ -98,7 +98,7 @@ void gather_block_distribution_info(MPI_Comm comm, const int64_t local_perm_size
 
 /* Internal function to apply a distributed permutation to a distributed set of
  * edges. */
-void apply_permutation_mpi(MPI_Comm comm, const int64_t local_perm_size, const int64_t* const local_vertex_perm, const int64_t N, const int64_t nedges, int64_t* result) {
+inline void apply_permutation_mpi(MPI_Comm comm, const int64_t local_perm_size, const int64_t* const local_vertex_perm, const int64_t N, const int64_t nedges, int64_t* result) {
   int rank, size;
 
   MPI_Comm_rank(comm, &rank);

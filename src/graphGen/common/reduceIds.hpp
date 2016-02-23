@@ -43,6 +43,8 @@
 #include "mxx/algos.hpp"
 #include "mxx/utils.hpp"
 
+#define PERMUTE 1
+
 namespace conn 
 {
   namespace graphGen
@@ -86,6 +88,16 @@ namespace conn
           }
         }
       };
+
+    /**
+     * @brief   returns the global size of the vector
+     */
+    template <typename vectorType>
+      std::size_t globalSizeOfVector(vectorType &v, mxx::comm &comm)
+      {
+        std::size_t localSize = v.size();
+        return mxx::allreduce(localSize, std::plus<std::size_t>());
+      }
 
     /**
      * @brief                         Given a graph as list of edges, it updates all the vertex ids so
@@ -220,17 +232,20 @@ namespace conn
           }
         } //SRC layer updated
 
+#ifdef PERMUTE 
+        //global count of vertices
+        std::size_t totalVertices = globalSizeOfVector(uniqueVertexList, comm);
+
+        for(auto &e :  edgeList)
+        {
+          std::get<SRC>(e) = (std::get<SRC>(e) * 2147483647) % totalVertices;
+          std::get<DEST>(e) = (std::get<DEST>(e) * 2147483647) % totalVertices;
+        }
+#endif
+
+
       }
 
-    /**
-     * @brief   returns the global size of the vector
-     */
-    template <typename vectorType>
-      std::size_t globalSizeOfVector(vectorType &v, mxx::comm &comm)
-      {
-        std::size_t localSize = v.size();
-        return mxx::allreduce(localSize, std::plus<std::size_t>());
-      }
   }
 }
  

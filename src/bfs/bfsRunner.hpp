@@ -159,8 +159,9 @@ namespace conn
          * @param[out]  countComponentSizes   vector of count of vertices visited during each BFS run
          * @details                           Each bfs run begins from unvisited vertex till it traverses
          *                                    that component
+         * @return                            number of iterations executed by BFS
          */
-        void runBFSIterations(std::size_t noIterations, std::vector<std::size_t> &countComponentSizes)
+        std::size_t runBFSIterations(std::size_t noIterations, std::vector<std::size_t> &countComponentSizes)
         {
           //Execute BFS noIterations times
           for(int i = 0; i < noIterations; i++) 
@@ -178,7 +179,7 @@ namespace conn
             if(srcPoint == MAX)
             {
               LOG_IF(comm.rank() == 0, INFO) << "All vertices already covered, no more BFS iterations required";
-              break;
+              return i;
             }
 
             //Frontier
@@ -243,6 +244,8 @@ namespace conn
 
             comm.barrier();
           }
+
+          return noIterations;
 
         }
 
