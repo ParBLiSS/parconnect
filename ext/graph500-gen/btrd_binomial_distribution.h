@@ -44,7 +44,7 @@ static double f_c(unsigned int k) {
   }
 }
 
-size_t btrd_binomial_distribution(size_t n_orig, double p, mrg_state* state) {
+inline size_t btrd_binomial_distribution(size_t n_orig, double p, mrg_state* state) {
   /* BTRD algorithm from pages 6--7 of "The Generation of Binomial Random
    * Variates" (Wolfgang Hoermann) --
    * http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.47.8407 */

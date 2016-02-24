@@ -1,5 +1,5 @@
-Parallel Implementation for Computing Graph Connectivity
-========================================================
+Parallel Implementation for Computing Graph Connectivity (SCC Submission)
+========================================================================
 [![Apache 2.0 License](https://img.shields.io/badge/license-Apache%20v2.0-blue.svg)](LICENSE)
 
 This library implements a distributed connectivity algorithm for large graphs. It can compute the connected components in the undirected graphs or [weakly connected components](http://mathworld.wolfram.com/WeaklyConnectedComponent.html) in the directed graphs. The algorithm is implemented in `C++11` and `MPI`. The codebase supports the graph generation for building de Bruijn graphs from DNA sequence files, synthetic kronecker graphs and also a parallel edgelist file reader for any generic graph.

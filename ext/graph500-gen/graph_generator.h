@@ -344,7 +344,7 @@ static void generate_kronecker_internal(
 }
 
 
-int64_t compute_edge_array_size(
+inline int64_t compute_edge_array_size(
        int rank, int size,
        int64_t M) {
   int64_t rankc = (int64_t)(rank);
@@ -354,7 +354,7 @@ int64_t compute_edge_array_size(
   return my_end_edge - my_start_edge;
 }
 
-void generate_kronecker(
+inline void generate_kronecker(
        int rank, int size,
        const uint_fast32_t seed[5] /* All values in [0, 2^31 - 1), not all zero */,
        int logN /* In base GRAPHGEN_INITIATOR_SIZE */,

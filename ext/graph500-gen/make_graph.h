@@ -26,8 +26,7 @@
 #include "scramble_edges.h"
 #include "utils.h"
 
-
-void make_graph(int log_numverts, int64_t desired_nedges, uint64_t userseed1, uint64_t userseed2, const double initiator[4], int64_t* nedges_ptr, int64_t** result_ptr) {
+inline void make_graph(int log_numverts, int64_t desired_nedges, uint64_t userseed1, uint64_t userseed2, const double initiator[4], int64_t* nedges_ptr, int64_t** result_ptr) {
   int64_t N, M;
   int rank, size;
 
@@ -111,7 +110,7 @@ void make_graph(int log_numverts, int64_t desired_nedges, uint64_t userseed1, ui
 /* PRNG interface for implementations; takes seed in same format as given by
  * users, and creates a vector of doubles in a reproducible (and
  * random-access) way. */
-void make_random_numbers(
+inline void make_random_numbers(
        /* in */ int64_t nvalues    /* Number of values to generate */,
        /* in */ uint64_t userseed1 /* Arbitrary 64-bit seed value */,
        /* in */ uint64_t userseed2 /* Arbitrary 64-bit seed value */,

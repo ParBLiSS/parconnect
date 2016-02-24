@@ -6359,7 +6359,7 @@ static void mrg_orig_step(mrg_state* state) { /* Use original A, not fully optim
 
 //extern const mrg_transition_matrix mrg_skip_matrices[][256]; [> In generated mrg_transitions.c <]
 
-void mrg_skip(mrg_state* state, uint_least64_t exponent_high, uint_least64_t exponent_middle, uint_least64_t exponent_low) {
+inline void mrg_skip(mrg_state* state, uint_least64_t exponent_high, uint_least64_t exponent_middle, uint_least64_t exponent_low) {
   /* fprintf(stderr, "skip(%016" PRIXLEAST64 "%016" PRIXLEAST64 "%016" PRIXLEAST64 ")\n", exponent_high, exponent_middle, exponent_low); */
   int byte_index;
   for (byte_index = 0; exponent_low; ++byte_index, exponent_low >>= 8) {
@@ -6378,32 +6378,32 @@ void mrg_skip(mrg_state* state, uint_least64_t exponent_high, uint_least64_t exp
 
 
 /* Returns integer value in [0, 2^31-1) */
-uint_fast32_t mrg_get_uint(const mrg_transition_matrix* mat, mrg_state* state) {
+inline uint_fast32_t mrg_get_uint(const mrg_transition_matrix* mat, mrg_state* state) {
   mrg_step(mat, state);
   return state->z1;
 }
 
 /* Returns real value in [0, 1) */
-double mrg_get_double(const mrg_transition_matrix* mat, mrg_state* state) {
+inline double mrg_get_double(const mrg_transition_matrix* mat, mrg_state* state) {
   return (double)mrg_get_uint(mat, state) * .000000000465661287524579692 /* (2^31 - 1)^(-1) */ +
          (double)mrg_get_uint(mat, state) * .0000000000000000002168404346990492787 /* (2^31 - 1)^(-2) */
     ;
 }
 
 /* Returns integer value in [0, 2^31-1) using original transition matrix. */
-uint_fast32_t mrg_get_uint_orig(mrg_state* state) {
+inline uint_fast32_t mrg_get_uint_orig(mrg_state* state) {
   mrg_orig_step(state);
   return state->z1;
 }
 
 /* Returns real value in [0, 1) using original transition matrix. */
-double mrg_get_double_orig(mrg_state* state) {
+inline double mrg_get_double_orig(mrg_state* state) {
   return (double)mrg_get_uint_orig(state) * .000000000465661287524579692 /* (2^31 - 1)^(-1) */ +
          (double)mrg_get_uint_orig(state) * .0000000000000000002168404346990492787 /* (2^31 - 1)^(-2) */
     ;
 }
 
-void mrg_seed(mrg_state* st, const uint_fast32_t seed[5]) {
+inline void mrg_seed(mrg_state* st, const uint_fast32_t seed[5]) {
   st->z1 = seed[0];
   st->z2 = seed[1];
   st->z3 = seed[2];
@@ -6411,7 +6411,7 @@ void mrg_seed(mrg_state* st, const uint_fast32_t seed[5]) {
   st->z5 = seed[4];
 }
 
-void mrg_init(mrg_transition_matrix* tm, mrg_state* st) {
+inline void mrg_init(mrg_transition_matrix* tm, mrg_state* st) {
   uint_fast32_t seed[5] = {1, 1, 1, 1, 1};
   mrg_make_A(tm);
   mrg_seed(st, seed);
@@ -6421,7 +6421,7 @@ void mrg_init(mrg_transition_matrix* tm, mrg_state* st) {
 
 /* Split a transition matrix; the result of this function is pre-cached so it
  * does not need to be called for individual splits of the PRNG state. */
-void mrg_split_matrix(const mrg_transition_matrix* tm_in,
+inline void mrg_split_matrix(const mrg_transition_matrix* tm_in,
                       mrg_transition_matrix* tm_out,
                       unsigned int n) {
   if (n == 0) return;
@@ -6433,7 +6433,7 @@ void mrg_split_matrix(const mrg_transition_matrix* tm_in,
  *
  * The state st_in should not be used for random number generation after this
  * function is called. */
-void mrg_split_state(const mrg_transition_matrix* tm_in,
+inline void mrg_split_state(const mrg_transition_matrix* tm_in,
                      const mrg_state* st_in,
                      mrg_state* st_out,
                      unsigned int n) {

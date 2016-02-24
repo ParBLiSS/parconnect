@@ -10,26 +10,8 @@ add_definitions( -DPROJECT_TEST_DATA_DIR=${PROJECT_SOURCE_DIR}/data)
 ## PERFORMANCE ##
 #################
 
-#add_executable(time_graph500_gen time_graph500_gen.cpp)
-#target_link_libraries(time_graph500_gen ${EXTRA_LIBS})
-
-#add_executable(time_ccl_coloring_chains time_ccl_coloring_chains.cpp)
-#target_link_libraries(time_ccl_coloring_chains ${EXTRA_LIBS})
-
-#add_executable(time_bfs_graph500 time_bfs_graph500.cpp)
-#target_link_libraries(time_bfs_graph500 ${EXTRA_LIBS} MPITypelib CommGridlib)
-
-#add_executable(time_dbgraph_gen time_dbgraph_gen.cpp)
-#target_link_libraries(time_dbgraph_gen  ${EXTRA_LIBS})
-
-#add_executable(time_graphFileIO_gen time_graphFileIO_gen.cpp)
-#target_link_libraries(time_graphFileIO_gen  ${EXTRA_LIBS})
-
-add_executable(time_bfs_coloring time_bfs_coloring.cpp)
-target_link_libraries(time_bfs_coloring  ${EXTRA_LIBS} MPITypelib CommGridlib)
-
-add_executable(time_ccl_coloring time_ccl_coloring.cpp)
-target_link_libraries(time_ccl_coloring  ${EXTRA_LIBS} MPITypelib CommGridlib)
+add_executable(benchmark_parconnect benchmark_parconnect.cpp)
+target_link_libraries(benchmark_parconnect ${EXTRA_LIBS} MPITypelib CommGridlib)
 
 add_executable(time_all2all time_all2all.cpp)
 target_link_libraries(time_all2all ${EXTRA_LIBS})

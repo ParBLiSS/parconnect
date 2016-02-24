@@ -121,7 +121,7 @@ static inline int int_prefix_sum(int* out, const int* in, size_t n) {
 }
 
 /* For MPI distributed memory. */
-void rand_sort_mpi(MPI_Comm comm, mrg_state* st, int64_t n,
+inline void rand_sort_mpi(MPI_Comm comm, mrg_state* st, int64_t n,
                    int64_t* result_size_ptr,
                    int64_t** result_ptr /* Allocated using xmalloc() by
                    rand_sort_mpi */) {
@@ -141,7 +141,7 @@ void rand_sort_mpi(MPI_Comm comm, mrg_state* st, int64_t n,
     indices[0] -= temp_base;
     indices[1] -= temp_base;
     MPI_Datatype old_types[] = {INT64_T_MPI_TYPE, INT64_T_MPI_TYPE};
-    MPI_Type_struct(2, blocklens, indices, old_types, &slot_data_type);
+    MPI_Type_create_struct(2, blocklens, indices, old_types, &slot_data_type);
     MPI_Type_commit(&slot_data_type);
   }
 

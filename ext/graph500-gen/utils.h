@@ -30,7 +30,7 @@
 
 
 
-void* xmalloc(size_t n) {
+inline void* xmalloc(size_t n) {
   void* p = malloc(n);
   if (!p) {
     fprintf(stderr, "Out of memory trying to allocate %zu byte(s)\n", n);
@@ -39,7 +39,7 @@ void* xmalloc(size_t n) {
   return p;
 }
 
-void* xcalloc(size_t n, size_t k) {
+inline void* xcalloc(size_t n, size_t k) {
   void* p = calloc(n, k);
   if (!p) {
     fprintf(stderr, "Out of memory trying to allocate %zu byte(s)\n", n);
@@ -52,7 +52,7 @@ void* xcalloc(size_t n, size_t k) {
 #ifdef __MTA__
 #pragma mta inline
 #endif
-uint_fast64_t random_up_to(mrg_state* st, uint_fast64_t n) {
+inline uint_fast64_t random_up_to(mrg_state* st, uint_fast64_t n) {
   /* PRNG returns values in [0, 0x7FFFFFFF) */
   /* Two iters returns values in [0, 0x3FFFFFFF00000001) */
   assert (n > 0 && n <= UINT64_C(0x3FFFFFFF00000001));
@@ -81,7 +81,7 @@ uint_fast64_t random_up_to(mrg_state* st, uint_fast64_t n) {
 
 /* Spread the two 64-bit numbers into five nonzero values in the correct
  * range. */
-void make_mrg_seed(uint64_t userseed1, uint64_t userseed2, uint_fast32_t* seed) {
+inline void make_mrg_seed(uint64_t userseed1, uint64_t userseed2, uint_fast32_t* seed) {
   seed[0] = (userseed1 & 0x3FFFFFFF) + 1;
   seed[1] = ((userseed1 >> 30) & 0x3FFFFFFF) + 1;
   seed[2] = (userseed2 & 0x3FFFFFFF) + 1;

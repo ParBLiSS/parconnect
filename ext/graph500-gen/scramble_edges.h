@@ -28,7 +28,7 @@
 
 
 /* For MPI distributed memory. */
-void scramble_edges_mpi(MPI_Comm comm,
+inline void scramble_edges_mpi(MPI_Comm comm,
                         const uint64_t userseed1, const uint64_t userseed2,
                         const int64_t local_nedges_in,
                         const int64_t* const local_edges_in,
