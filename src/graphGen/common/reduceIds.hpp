@@ -42,8 +42,7 @@
 #include "mxx/sort.hpp"
 #include "mxx/algos.hpp"
 #include "mxx/utils.hpp"
-
-#define PERMUTE 1
+#include "hash/invertible_hash.hpp"
 
 namespace conn 
 {
@@ -97,6 +96,21 @@ namespace conn
       {
         std::size_t localSize = v.size();
         return mxx::allreduce(localSize, std::plus<std::size_t>());
+      }
+
+    /*
+     * @brief   relabes vertex ids using invertible hash function
+     */
+    template <typename E>
+      void permuteVectorIds(std::vector<std::pair<E,E>> &edgeList)
+      {
+        const int SRC = 0, DEST = 1;
+
+        for(auto &e : edgeList)
+        {
+          hash_64(std::get<SRC>(e));
+          hash_64(std::get<DEST>(e));
+        }
       }
 
     /**
@@ -231,21 +245,7 @@ namespace conn
             it = edgeListRange.second;
           }
         } //SRC layer updated
-
-#ifdef PERMUTE 
-        //global count of vertices
-        std::size_t totalVertices = globalSizeOfVector(uniqueVertexList, comm);
-
-        for(auto &e :  edgeList)
-        {
-          std::get<SRC>(e) = (std::get<SRC>(e) * 2147483647) % totalVertices;
-          std::get<DEST>(e) = (std::get<DEST>(e) * 2147483647) % totalVertices;
-        }
-#endif
-
-
       }
-
   }
 }
  
