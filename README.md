@@ -1,4 +1,4 @@
-Parallel Implementation for Computing Graph Connectivity (SCC Submission)
+Parallel Implementation for Computing Graph Connectivity
 ========================================================================
 [![Apache 2.0 License](https://img.shields.io/badge/license-Apache%20v2.0-blue.svg)](LICENSE)
 
