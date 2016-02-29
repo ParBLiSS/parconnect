@@ -47,35 +47,23 @@ namespace conn
     {
       public:
 
-        static const uint8_t LOWTOHIGH_IDS = 0;
-
-        //TODO: Low Priority task, enable chain construction with random ids
-        //static const uint8_t RANDOM_IDS = 1;
-        
         /**
          * @brief                 populates the edge list vector 
          * @param[in] chainLength length of the graph i.e. the count of nodes (not the edges)
-         * @param[in] mode        choose between LOWTOHIGH_IDS, RANDOM_IDS
-         *                        like 0-1-2...100 (low to high ids)
-         *                        or 45-72-21..34 (random ids)
+         *                        For example, chain of length 100 will be like 0-1-2...100
          * @param[out] edgeList   input vector to fill up
          */
         template <typename T>
         void populateEdgeList( std::vector< std::pair<T, T> > &edgeList, 
             uint64_t chainLength, 
-            uint8_t mode,
             const mxx::comm &comm = mxx::comm())
         {
           mxx::section_timer timer;
-
-          //sanity check
-          assert(mode == LOWTOHIGH_IDS);
 
           //Know the portion of graph to be generated locally 
           //Lets divide the chainLength value by the number of processes
           mxx::partition::block_decomposition<T> part(chainLength, comm.size(), comm.rank());
 
-          if(mode == LOWTOHIGH_IDS)
           {
             //First node (vertex) id on this MPI node
             T beginNodeId = part.excl_prefix_size(); 

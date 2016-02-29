@@ -31,6 +31,7 @@
 #include "graphGen/fileIO/graphReader.hpp"
 #include "graphGen/deBruijn/deBruijnGraphGen.hpp"
 #include "graphGen/graph500/graph500Gen.hpp"
+#include "graphGen/undirectedChain/undirectedChainGen.hpp" 
 #include "graphGen/common/reduceIds.hpp"
 #include "coloring/labelProp.hpp"
 #include "bfs/bfsRunner.hpp"
@@ -68,10 +69,12 @@ int main(int argc, char** argv)
   cmd.setIntroductoryDescription("Benchmark for computing connectivity in the Student Cluster Competition");
   cmd.setHelpOption("h", "help", "Print this help page");
 
-  cmd.defineOption("input", "dbg or kronecker or generic", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
-  cmd.defineOption("file", "input file", ArgvParser::OptionRequiresValue);
-  cmd.defineOption("scale", "scale of the graph", ArgvParser::OptionRequiresValue);
-  cmd.defineOption("bfsiter", "number of BFS iterations to execute at the start, default is 1", ArgvParser::OptionRequiresValue);
+  cmd.defineOption("input", "dbg or kronecker or generic or chain", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("file", "input file (if input = dbg or generic)", ArgvParser::OptionRequiresValue);
+  cmd.defineOption("scale", "scale of the graph (if input = kronecker)", ArgvParser::OptionRequiresValue);
+  cmd.defineOption("bfsiter", "number of BFS iterations to execute at the start, default is 1", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("pointerDouble", "set to y/n to control pointer doubling during coloring", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
+  cmd.defineOption("chainLength", "length of undirected chain graph (if input = chain)", ArgvParser::OptionRequiresValue);
 
   int result = cmd.parse(argc, argv);
 
@@ -98,8 +101,14 @@ int main(int argc, char** argv)
   //Read number of bfs iterations
   std::size_t bfsIterations = 1;  //Default
 
-  if(cmd.foundOption("bfsiter"))
-    bfsIterations = std::stoi(cmd.optionValue("bfsiter")); 
+  //Fetch the pointer doubling choice
+  bool pointerDouble;
+  if(cmd.optionValue("pointerDouble") == "y")
+    pointerDouble = true;
+  else
+    pointerDouble = false;
+
+  bfsIterations = std::stoi(cmd.optionValue("bfsiter")); 
 
   //Construct graph based on the given input mode
   if(cmd.optionValue("input") == "generic")
@@ -163,8 +172,27 @@ int main(int argc, char** argv)
     //Object of the graph500 generator class
     conn::graphGen::Graph500Gen g;
 
-    //Populate the edgeList, using undirected mode that includes the edge and its reverse
+    //Populate the edgeList
     g.populateEdgeList(edgeList, scale, edgefactor, comm); 
+  }
+  else if(cmd.optionValue("input") == "chain")
+  {
+    int chainLength;
+    if(cmd.foundOption("chainLength"))
+      chainLength = std::stoi(cmd.optionValue("chainLength"));
+    else
+    {
+      std::cout << "Required option missing: '--chainLength'\n";
+      exit(1);
+    }
+
+    LOG_IF(!comm.rank(), INFO) << "Chain length -> " << chainLength;
+
+    //Object of the chain generator class
+    conn::graphGen::UndirectedChainGen g;
+
+    //Populate the edgeList 
+    g.populateEdgeList(edgeList, chainLength, comm);
   }
   else
   {
@@ -183,9 +211,15 @@ int main(int argc, char** argv)
 
   //Relable the ids
   conn::graphGen::permuteVectorIds(edgeList);
+  LOG_IF(!comm.rank(), INFO) << "Vertex ids permuted";
 
   //Call the graph reducer function
-  if(bfsIterations > 0) conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
+  if(bfsIterations > 0) 
+  {
+    conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
+    LOG_IF(!comm.rank(), INFO) << "Ids compacted for BFS run";
+  }
+
 
   //Count of vertices, edges in the reduced graph
   std::size_t nVertices = conn::graphGen::globalSizeOfVector(uniqueVertexList, comm);
@@ -217,9 +251,19 @@ int main(int argc, char** argv)
 
   LOG_IF(!comm.rank(), INFO) << noBFSIterationsExecuted << " BFS iterations executed";
 
+  if(pointerDouble)
   {
     comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
-        conn::coloring::ccl<vertexIdType> cclInstance(edgeList, comm);
+        conn::coloring::ccl<vertexIdType, conn::coloring::lever::ON> cclInstance(edgeList, comm);
+        cclInstance.compute();
+
+        countComponents += cclInstance.computeComponentCount();
+    });
+  }
+  else
+  {
+     comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
+        conn::coloring::ccl<vertexIdType, conn::coloring::lever::OFF> cclInstance(edgeList, comm);
         cclInstance.compute();
 
         countComponents += cclInstance.computeComponentCount();
