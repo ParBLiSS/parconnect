@@ -1,6 +1,6 @@
 [submodule "ext/mxx"]
 	path = ext/mxx
-	url = https://github.com/patflick/mxx.git
+	url = https://github.com/cjain7/mxx.git
 [submodule "ext/bliss"]
 	path = ext/bliss
 	url = https://github.com/ParBLiSS/kmerind.git
