@@ -135,9 +135,9 @@ namespace conn
           addReverseEdge(addReverseEdge),
           filename(filename),
           comm(comm.copy())
-      {
-        static_assert(std::is_same<E, vID>::value, "Edge vector type should match");
-      }
+        {
+          static_assert(std::is_same<E, vID>::value, "Edge vector type should match");
+        }
 
         /**
          * @brief                   populates the edge list vector 
@@ -158,8 +158,14 @@ namespace conn
           //====  now process the file, one L1 block partition per MPI Rank 
           typename FileLoaderType::L1BlockType partition = loader.getNextL1Block();
 
+          //To print the global file range
+          //if (!comm.rank()) std::cout << "Global range " << loader.getFileRange() << std::endl;
+
           //Range of the file partition this MPI rank reads
           auto localFileRange = partition.getRange();
+
+          //To print the local file range each rank reads
+          //std::cout << "Rank " << comm.rank() << " , local file range" << localFileRange << std::endl;
 
           //Iterator over data in the file
           typename FileLoaderType::L1BlockType::iterator dataIter = partition.begin();
@@ -173,7 +179,7 @@ namespace conn
           //lastEdgeRead will be false when we reach the partition end boundary
           while (lastEdgeRead) {
 
-            lastEdgeRead = readAnEdge(dataIter, partition.end(), i);
+            lastEdgeRead = readAnEdge(dataIter, partition.end(), i, localFileRange.end);
           }
 
           timer.end_section("File IO completed, graph built");
@@ -187,13 +193,16 @@ namespace conn
          *                    false if partition boundary is encountered 
          */
         template <typename Iter>
-          bool readAnEdge(Iter& curr, const Iter &end, std::size_t& offset) 
+          bool readAnEdge(Iter& curr, const Iter &end, std::size_t& offset, std::size_t offsetEndRange) 
           {
             //make sure we point to non EOL value
             this->findNonEOL(curr, end, offset);
 
             //string to save the contents of a line
             std::string readLine;
+
+            if(offset >= offsetEndRange || curr == end)
+              return false;
 
             //till we see end of line
             while( ! (*curr == baseType::eol || *curr == baseType::cr)) 

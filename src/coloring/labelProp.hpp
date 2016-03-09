@@ -39,7 +39,6 @@
 #include "mxx_extra/sort.hpp"
 #include "mxx/comm.hpp"
 #include "extutils/logging.hpp"
-#include "extutils/prettyprint.hpp"
 
 namespace conn 
 {
