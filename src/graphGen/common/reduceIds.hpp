@@ -21,7 +21,7 @@
  * @brief   Given a graph as list of edges, it reduces the vertex ids so that they are contiguous
  *          This process reduces memory usage if graph is represented as an adjacency matrix later.
  *
- * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
+ * Copyright (c) 2016 Georgia Institute of Technology. All Rights Reserved.
  */
 
 #ifndef GRAPH_REDUCE_HPP

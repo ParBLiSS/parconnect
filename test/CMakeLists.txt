@@ -20,6 +20,16 @@ target_link_libraries(time_all2all ${EXTRA_LIBS})
 ## CORRECTNESS ##
 #################
 
+OPTION(BUILD_CONN_UTILS "Build the utilities utils_*.cpp" OFF)
+
+if(BUILD_CONN_UTILS)
+  add_executable(exportGraphDotFormat utils_exportGraphDotFormat.cpp)
+  target_link_libraries(exportGraphDotFormat ${EXTRA_LIBS})
+
+  add_executable(exportBinaryFormat utils_exportBinaryFormat.cpp)
+  target_link_libraries(exportBinaryFormat ${EXTRA_LIBS})
+endif(BUILD_CONN_UTILS)
+
 OPTION(BUILD_CONN_TESTS "Build the test code for checking parallel connectivity" OFF)
 
 if(BUILD_CONN_TESTS)

@@ -20,7 +20,7 @@
  * @author  Chirag Jain <cjain7@gatech.edu>
  * @brief   Computes connected components in a graph given as a general file input 
  *
- * Copyright (c) 2015 Georgia Institute of Technology. All Rights Reserved.
+ * Copyright (c) 2016 Georgia Institute of Technology. All Rights Reserved.
  */
 
 //Includes
