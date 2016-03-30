@@ -13,6 +13,12 @@
 //  http://easylogging.muflihun.com
 //  http://muflihun.com
 //
+
+
+/*
+ * This file has minor modifications to work with the parConnect library
+ * All the changes can be looked by searching for word 'CJ'
+ */
 #ifndef EASYLOGGINGPP_H
 #define EASYLOGGINGPP_H
 // Compilers and C++0x/C++11 Evaluation
@@ -2598,13 +2604,15 @@ public:
     void setToDefault(void) {
         setGlobally(ConfigurationType::Enabled, std::string("true"), true);
 #if !defined(ELPP_NO_DEFAULT_LOG_FILE)
-        //CJ changed this configurations to avoid renundant log files 
+        //CJ commented this line
         //setGlobally(ConfigurationType::Filename, std::string(base::consts::kDefaultLogFile), true);
 #else
         ELPP_UNUSED(base::consts::kDefaultLogFile);
 #endif  // !defined(ELPP_NO_DEFAULT_LOG_FILE)
         //CJ changed this configurations to avoid renundant log files 
         //setGlobally(ConfigurationType::ToFile, std::string("true"), true);
+        setGlobally(ConfigurationType::ToFile, std::string("false"), false);
+
         setGlobally(ConfigurationType::ToStandardOutput, std::string("true"), true);
         setGlobally(ConfigurationType::MillisecondsWidth, std::string("3"), true);
         setGlobally(ConfigurationType::PerformanceTracking, std::string("true"), true);
@@ -3046,7 +3054,8 @@ private:
             } else if (conf->configurationType() == ConfigurationType::MaxLogFileSize) {
                 setValue(conf->level(), static_cast<std::size_t>(getULong(conf->value())), &m_maxLogFileSizeMap);
 #if !defined(ELPP_NO_DEFAULT_LOG_FILE)
-                withFileSizeLimit.push_back(conf);
+                //CJ commented this line
+                //withFileSizeLimit.push_back(conf);
 #endif  // !defined(ELPP_NO_DEFAULT_LOG_FILE)
             } else if (conf->configurationType() == ConfigurationType::LogFlushThreshold) {
                 setValue(conf->level(), static_cast<std::size_t>(getULong(conf->value())), &m_logFlushThresholdMap);
