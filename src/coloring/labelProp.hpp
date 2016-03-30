@@ -220,17 +220,19 @@ namespace conn
             auto end = tupleVector.end();
 
             //Log the min, mean and max count of active tuples across ranks
-            //printWorkLoad(mid, end, comm);
+#ifdef BENCHMARK_CONN
+            printWorkLoad(mid, end, comm);
+#endif
 
             //Update Pn layer (Explore neighbors of a node and find potential partition candidates
             updatePn(mid, tupleVector.end());
 
-            timer.end_section("\tPn update done");
+            timer.end_section("Pn update done");
             
             //Update the Pc layer, choose the best candidate
             converged = updatePc(mid, tupleVector.end(), parentRequestTupleVector);
 
-            timer.end_section("\tPc update done");
+            timer.end_section("Pc update done");
 
             //Perform pointer doubling if enabled
             if(DOUBLING)
@@ -241,7 +243,7 @@ namespace conn
               //the pointer doubling, so redo it
               mxx::distribute_inplace(tupleVector, comm);
 
-              timer.end_section("\tPointer doubling done");
+              timer.end_section("Pointer doubling done");
             }
 
 
@@ -259,14 +261,14 @@ namespace conn
               //use std::partition to move stable tuples to the left
               mid = partitionStableTuples<cclTupleIds::Pn>(mid, end);
 
-              timer.end_section("\tStable partitons placed aside");
+              timer.end_section("Stable partitons placed aside");
 
               if(OPTIMIZATION == opt_level::loadbalanced)
               {
                 mid = mxx::block_decompose_partitions(begin, mid, end, comm);
                 //Re distributed the tuples to balance the load across the ranks
               
-                timer.end_section("\tLoad balanced");
+                timer.end_section("Load balanced");
               }
             }
             distance_begin_mid = std::distance(begin, mid);

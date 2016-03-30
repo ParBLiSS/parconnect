@@ -41,6 +41,7 @@
 #include "extutils/argvparser.hpp"
 #include "mxx/reduction.hpp"
 #include "mxx/utils.hpp"
+#include "mxx/timer.hpp"
 
 INITIALIZE_EASYLOGGINGPP
 using namespace std;
@@ -109,6 +110,10 @@ int main(int argc, char** argv)
     pointerDouble = false;
 
   bfsIterations = std::stoi(cmd.optionValue("bfsiter")); 
+
+#ifdef BENCHMARK_CONN
+  mxx::section_timer timer(std::cerr, comm);
+#endif
 
   //Construct graph based on the given input mode
   if(cmd.optionValue("input") == "generic")
@@ -200,6 +205,10 @@ int main(int argc, char** argv)
     exit(1);
   }
 
+#ifdef BENCHMARK_CONN
+  timer.end_section("Graph construction completed");
+#endif
+
   /**
    * COMPUTE CONNECTIVITY
    */
@@ -213,11 +222,19 @@ int main(int argc, char** argv)
   conn::graphGen::permuteVectorIds(edgeList);
   LOG_IF(!comm.rank(), INFO) << "Vertex ids permuted";
 
+#ifdef BENCHMARK_CONN
+  timer.end_section("Vertex Ids permuted");
+#endif
+
   //Call the graph reducer function
   if(bfsIterations > 0) 
   {
     conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
     LOG_IF(!comm.rank(), INFO) << "Ids compacted for BFS run";
+
+#ifdef BENCHMARK_CONN
+    timer.end_section("Vertex Ids relabeled (contiguous)");
+#endif
   }
 
 
@@ -243,8 +260,16 @@ int main(int argc, char** argv)
     //Run BFS once
     noBFSIterationsExecuted = bfsInstance.runBFSIterations(bfsIterations, componentCountsResult); 
 
+#ifdef BENCHMARK_CONN
+    timer.end_section("BFS iterations executed");
+#endif
+
     //Get the remaining edgeList
     bfsInstance.filterEdgeList();
+
+#ifdef BENCHMARK_CONN
+    timer.end_section("Remaining graph filtered out");
+#endif
   }
 
   std::size_t countComponents = noBFSIterationsExecuted;
@@ -270,6 +295,10 @@ int main(int argc, char** argv)
     });
   }
 
+#ifdef BENCHMARK_CONN
+    timer.end_section("Coloring completed");
+#endif
+
   countComponents = mxx::allreduce(countComponents, mxx::max<std::size_t>());
   LOG_IF(!comm.rank(), INFO) << "Count of components -> " << countComponents;
 
@@ -277,7 +306,7 @@ int main(int argc, char** argv)
   auto end = std::chrono::steady_clock::now();
   auto elapsed_time  = std::chrono::duration<double, std::milli>(end - start).count(); 
 
-  LOG_IF(!comm.rank(), INFO) << "Time (ms) -> " << elapsed_time;
+  LOG_IF(!comm.rank(), INFO) << "Time excluding graph construction (ms) -> " << elapsed_time;
 
   MPI_Finalize();
   return(0);

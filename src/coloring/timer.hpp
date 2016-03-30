@@ -31,7 +31,12 @@
 
 //Switch to 1 if verbose time log is required during the 
 //label propagation, else keep it 0
+
+#ifdef BENCHMARK_CONN
+#define COLORING_ENABLE_TIMER 1
+#else
 #define COLORING_ENABLE_TIMER 0
+#endif
 
 namespace conn 
 {
