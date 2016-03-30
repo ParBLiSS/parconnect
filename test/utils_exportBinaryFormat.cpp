@@ -39,6 +39,7 @@
 //External includes
 #include "extutils/logging.hpp"
 #include "extutils/argvparser.hpp"
+#include "mxx/timer.hpp"
 
 
 INITIALIZE_EASYLOGGINGPP
@@ -89,6 +90,10 @@ int main(int argc, char** argv)
   std::vector< std::pair<vertexIdType, vertexIdType> > edgeList;
 
   LOG_IF(!comm.rank(), INFO) << "Generating graph";
+
+#ifdef BENCHMARK_CONN
+  mxx::section_timer timer(std::cerr, comm);
+#endif
 
   //Construct graph based on the given input mode
   if(cmd.optionValue("input") == "generic")
@@ -161,14 +166,23 @@ int main(int argc, char** argv)
     exit(1);
   }
 
+#ifdef BENCHMARK_CONN
+  timer.end_section("Graph construction completed");
+#endif
+
 
   //Initialize the distributed vector for saving unique vertices
   std::vector<vertexIdType> uniqueVertexList;
+
 
   if(cmd.optionValue("relabel") == "y") 
   {
     conn::graphGen::reduceVertexIds(edgeList, uniqueVertexList, comm);
     LOG_IF(!comm.rank(), INFO) << "Ids relabled and made contiguous";
+
+#ifdef BENCHMARK_CONN
+    timer.end_section("Vertices relabelled");
+#endif
   }
 
   std::string outputPath =  cmd.optionValue("outputPath");
