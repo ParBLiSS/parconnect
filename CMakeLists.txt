@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 2.6)
 # project settings
 project(parConnect)
 
+#### If compiling on NERSC Cray cluster, specify the compilers
+#SET(CMAKE_CXX_COMPILER /opt/cray/craype/2.5.1/bin/CC)
+#SET(CMAKE_C_COMPILER /opt/cray/craype/2.5.1/bin/cc)
+#SET(BUILD_SHARED_LIBS "OFF")
+
+
 ##### General Compilation Settings
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11  -Drestrict=__restrict__  -ffast-math -DGRAPH_GENERATOR_MPI -DGRAPHGEN_DISTRIBUTED_MEMORY")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
@@ -17,7 +23,7 @@ endif()
 
 #Set default cmake build type
 IF(NOT CMAKE_BUILD_TYPE)
-  SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
+  SET(CMAKE_BUILD_TYPE Release CACHE STRING
     "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
     FORCE)
 ENDIF(NOT CMAKE_BUILD_TYPE)
