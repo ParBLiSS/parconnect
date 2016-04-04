@@ -158,7 +158,7 @@ namespace conn
         //Update the DEST layer of all the edges
         {
           //Globally sort all the edges by DEST layer
-          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<DEST>());
+          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<DEST>(), comm);
 
           auto allSplitters = mxx::allgather(std::get<DEST>(edgeList.front()));
           allSplitters.erase(allSplitters.begin()); //Discard element that came from rank 0
@@ -204,7 +204,7 @@ namespace conn
         //Update the SRC layer of all the edges
         {
           //Globally sort all the edges by SRC layer
-          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>());
+          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>(), comm);
 
           auto allSplitters = mxx::allgather(std::get<SRC>(edgeList.front()));
           allSplitters.erase(allSplitters.begin()); //Discard element that came from rank 0

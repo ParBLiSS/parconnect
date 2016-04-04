@@ -58,7 +58,10 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin CACHE PATH "Output director
 # compile CombBLAS
 add_subdirectory("${PROJECT_SOURCE_DIR}/ext/CombBLAS")
 
-# include external repositories : mxx, graph500-gen, bliss 
+# add plfit 
+add_subdirectory("${PROJECT_SOURCE_DIR}/ext/plfit")
+
+# include external repositories : mxx, graph500-gen, bliss, plfit
 include_directories("${PROJECT_SOURCE_DIR}/ext/mxx/include")
 include_directories("${PROJECT_SOURCE_DIR}/ext")
 
