@@ -94,6 +94,9 @@ namespace conn
 
         std::size_t maxDegree = 0;
 
+        //Vector to hold boundary vertex degrees
+        std::vector<std::pair<E,E>> boundaryVertexDegrees;
+
         for(auto it = edgeList.begin(); it != edgeList.end();)
         {
           auto equalSrcRange = conn::utils::findRange(it, edgeList.end(), *it, conn::utils::TpleComp<SRC>()); 
@@ -103,14 +106,44 @@ namespace conn
 
           auto currentDegree = std::distance(equalSrcRange.first, uniqueDestVerticeIter);
 
-          degreeCountMap[currentDegree]++;
+          if(equalSrcRange.first == edgeList.begin())   //First bucket
+            boundaryVertexDegrees.emplace_back(std::get<SRC>(*it), currentDegree);
+          else if(equalSrcRange.second == edgeList.end() && equalSrcRange.first != edgeList.begin())   //Last bucket (and different from first bucket)
+            boundaryVertexDegrees.emplace_back(std::get<SRC>(*it), currentDegree);
+          else
+          {
+            //This bucket is completely local to this rank
+            degreeCountMap[currentDegree]++;
 
-          if(currentDegree > maxDegree)
-            maxDegree = currentDegree;
+            if(currentDegree > maxDegree)
+              maxDegree = currentDegree;
+          }
 
           it = equalSrcRange.second;
         }
-        //Note that we are not worrying about boundary conditions here becuase we just need to see how the curve looks like
+
+        auto globalBoundaryVertexDegrees = mxx::gatherv(boundaryVertexDegrees, 0, comm);
+
+        if(comm.rank() == 0)
+        {
+          const int SRC = 0, COUNT = 1;
+
+          for(auto it = boundaryVertexDegrees.begin(); it != boundaryVertexDegrees.end();)
+          {
+            auto equalSrcRange = conn::utils::findRange(it, globalBoundaryVertexDegrees.end(), *it, conn::utils::TpleComp<SRC>());
+          
+            auto currentDegree = std::accumulate(equalSrcRange.first, equalSrcRange.second, 0, [&](const E &p1, const std::pair<E,E> &p2){
+                return p1 + std::get<COUNT>(p2);
+                });
+
+            if(currentDegree > maxDegree)
+              maxDegree = currentDegree;
+
+            degreeCountMap[currentDegree]++;
+
+            it = equalSrcRange.second;
+          }
+        }
         
         maxDegree = mxx::allreduce(maxDegree, mxx::max<std::size_t>(), comm);
 
