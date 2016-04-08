@@ -19,6 +19,9 @@ target_link_libraries(benchmark_parconnect_auto ${EXTRA_LIBS} MPITypelib CommGri
 add_executable(time_all2all time_all2all.cpp)
 target_link_libraries(time_all2all ${EXTRA_LIBS})
 
+add_executable(time_sort time_sort.cpp)
+target_link_libraries(time_sort ${EXTRA_LIBS})
+
 #################
 ## CORRECTNESS ##
 #################
