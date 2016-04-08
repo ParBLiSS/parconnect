@@ -79,7 +79,7 @@ namespace conn
     template <typename E>
       bool runBFSDecision(std::vector<std::pair<E,E>> &edgeList, mxx::comm &comm)
       {
-        const int SRC = 0, DEST = 1;
+        const int SRC = 1, DEST = 0;  //Reverse the layers to avoid sorting during relabeling vertices
 
         const int sampler = 11;
 

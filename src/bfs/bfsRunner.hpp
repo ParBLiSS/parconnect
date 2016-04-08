@@ -277,7 +277,8 @@ namespace conn
 
             //Globally sort all the edges by SRC layer
             //Should be quick as edgeList was latest sorted by SRC while reducing ids
-            mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>(), comm);
+            if(!mxx::is_sorted(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>(), comm))
+              mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>(), comm);
 
             //Define the splitters using the first SRC element of the edge
             auto allSplitters = mxx::allgather(std::get<SRC>(edgeList.front()));

@@ -160,26 +160,11 @@ namespace conn
         {
           Timer timer(std::cerr, comm);
 
-          //Sort the edgeList by src id of each edge
-          mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<edgeListTIds::src>(), comm); 
-
           //Reserve the approximate required space in our vector
           tupleVector.reserve(edgeList.size());
 
-          for(auto it = edgeList.begin(); it != edgeList.end(); )
-          {
-            //Range of edges with same source vertex
-            auto equalRange = conn::utils::findRange(it, edgeList.end(), *it, conn::utils::TpleComp<edgeListTIds::src>());
-
-            //Range would include atleast 1 element
-            assert(std::distance(equalRange.first, equalRange.second) > 0);
-
-            //Insert other vertex members in this partition 
-            for(auto it2 = equalRange.first; it2 != equalRange.second; it2++)
-              tupleVector.emplace_back(std::get<edgeListTIds::src>(*it2), MAX_PID, std::get<edgeListTIds::dst>(*it2));;
-
-            it = equalRange.second;
-          }
+          for(auto it = edgeList.begin(); it != edgeList.end(); it++)
+            tupleVector.emplace_back(std::get<edgeListTIds::src>(*it), MAX_PID, std::get<edgeListTIds::dst>(*it));;
 
           timer.end_section("vector of tuples initialized for ccl");
 
