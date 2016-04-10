@@ -293,20 +293,30 @@ namespace conn
             //Local sort
             std::sort(unVisitedVerticesArray.begin(), unVisitedVerticesArray.end());
 
+            
+            //Boundary case
+            {
+              //To resolve the boundary splits of equal SRC edges, we need to do a left shift of first unvisited vertex
+              
+              E firstUnvisitedVertex = MAX;
+              if(unVisitedVerticesArray.size() > 0)
+                firstUnvisitedVertex = unVisitedVerticesArray.front();
+
+              E nextProcsFirstUnvisitedVertex = mxx::left_shift(firstUnvisitedVertex, comm);
+
+              //ranks 0.. p-2
+              if(comm.rank() < comm.size() - 1 && nextProcsFirstUnvisitedVertex != MAX)
+                unVisitedVerticesArray.push_back(nextProcsFirstUnvisitedVertex);
+            }
+
+
             //Do the filtering among the subset of ranks which have non-zero unvisited elements
             //This is required in the cases where BFS traverses all or almost all the edges
             comm.with_subset(unVisitedVerticesArray.size() > 0, [&](const mxx::comm& comm){
 
-                //To resolve the boundary splits across edgelist, we need to do a left shift of first element
-                //of this array from ranks 1.. p-1
-                E nextProcsFirstUnvisitedVertex = mxx::left_shift(unVisitedVerticesArray.front(), comm);
-
-                //ranks 0.. p-2
-                if(comm.rank() < comm.size() - 1)
-                  unVisitedVerticesArray.push_back(nextProcsFirstUnvisitedVertex);
-
                 //Start traversal over vertex array
                 auto it2 = edgeList.begin();
+
                 for(auto it = unVisitedVerticesArray.begin(); it != unVisitedVerticesArray.end(); it++)
                 {
                   //Edges whose SRC element equals the unvisited vertex element
@@ -328,6 +338,9 @@ namespace conn
             //Ensure the block decomposition of edgeList
             mxx::distribute_inplace(edgeList, comm);
           });
+
+          auto newEdgeListSize = graphGen::globalSizeOfVector(edgeList, comm);;
+          LOG_IF(comm.rank() == 0, INFO) << "Edge count remaining after BFS " << newEdgeListSize;
 
         }
 
