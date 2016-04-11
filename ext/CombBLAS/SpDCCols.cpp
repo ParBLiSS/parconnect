@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
- Copyright (c) 2011, Aydin Buluc
+ Copyright (c) 2010-2014, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -105,7 +105,7 @@ SpDCCols<IT,NT>::SpDCCols(const SpDCCols<IT,NT> & rhs)
  *	\n		else rhs is assumed to be a column sorted SpTuples object
  **/
 template <class IT, class NT>
-SpDCCols<IT,NT>::SpDCCols(const SpTuples<IT,NT> & rhs, bool transpose)
+SpDCCols<IT,NT>::SpDCCols(const SpTuples<IT, NT> & rhs, bool transpose)
 : m(rhs.m), n(rhs.n), nnz(rhs.nnz), splits(0)
 {	 
 	
@@ -183,6 +183,161 @@ SpDCCols<IT,NT>::SpDCCols(const SpTuples<IT,NT> & rhs, bool transpose)
 }
 
 
+
+
+/**
+ * Multithreaded Constructor for converting tuples matrix -> SpDCCols
+ * @param[in] 	rhs if transpose=true,
+ *	\n		then tuples is assumed to be a row sorted list of tuple objects
+ *	\n		else tuples is assumed to be a column sorted list of tuple objects
+ **/
+
+
+template <class IT, class NT>
+SpDCCols<IT,NT>::SpDCCols(IT nRow, IT nCol, IT nTuples, const tuple<IT, IT, NT>*  tuples, bool transpose)
+: m(nRow), n(nCol), nnz(nTuples), splits(0)
+{
+    
+    if(nnz == 0)	// m by n matrix of complete zeros
+    {
+        dcsc = NULL;
+    }
+    else
+    {
+        int totThreads;
+#pragma omp parallel
+        {
+            totThreads = omp_get_num_threads();
+        }
+        
+        vector <IT> tstart(totThreads);
+        vector <IT> tend(totThreads);
+        vector <IT> tdisp(totThreads+1);
+        
+        // extra memory, but replaces an O(nnz) loop by an O(nzc) loop
+        IT* temp_jc = new IT[nTuples];
+        IT* temp_cp = new IT[nTuples];
+
+
+#pragma omp parallel
+        {
+            int threadID = omp_get_thread_num();
+            IT start = threadID * (nTuples / totThreads);
+            IT end = (threadID + 1) * (nTuples / totThreads);
+            if(threadID == (totThreads-1)) end = nTuples;
+            IT curpos=start;
+            if(end>start) // no work for the current thread
+            {
+                temp_jc[start] = std::get<1>(tuples[start]);
+                temp_cp[start] = start;
+                for (IT i = start+1; i < end; ++i)
+                {
+                    if(std::get<1>(tuples[i]) != temp_jc[curpos] )
+                    {
+                        temp_jc[++curpos] = std::get<1>(tuples[i]);
+                        temp_cp[curpos] = i;
+                    }
+                }
+            }
+           
+            tstart[threadID] = start;
+            if(end>start) tend[threadID] = curpos+1;
+            else tend[threadID] = end; // start=end
+        }
+
+        
+        // serial part
+        for(int t=totThreads-1; t>0; --t)
+        {
+            if(tend[t] > tstart[t] && tend[t-1] > tstart[t-1])
+            {
+                if(temp_jc[tstart[t]] == temp_jc[tend[t-1]-1])
+                {
+                    tstart[t] ++;
+                }
+            }
+        }
+        
+        tdisp[0] = 0;
+        for(int t=0; t<totThreads; ++t)
+        {
+            tdisp[t+1] = tdisp[t] + tend[t] - tstart[t];
+        }
+
+        IT localnzc = tdisp[totThreads];
+        dcsc = new Dcsc<IT,NT>(nTuples,localnzc);
+    
+#pragma omp parallel
+        {
+            int threadID = omp_get_thread_num();
+            std::copy(temp_jc + tstart[threadID],  temp_jc + tend[threadID], dcsc->jc + tdisp[threadID]);
+            std::copy(temp_cp + tstart[threadID],  temp_cp + tend[threadID], dcsc->cp + tdisp[threadID]);
+        }
+        dcsc->cp[localnzc] = nTuples;
+
+        delete [] temp_jc;
+        delete [] temp_cp;
+        
+#pragma omp parallel for schedule (static)
+        for(IT i=0; i<nTuples; ++i)
+        {
+            dcsc->ir[i]  = std::get<0>(tuples[i]);
+            dcsc->numx[i] = std::get<2>(tuples[i]);
+        }
+     }
+    
+    if(transpose) Transpose(); // this is not efficient, think to improve later. We included this parameter anyway to make this constructor different from another constracttor when the fourth argument is passed as 0.
+}
+
+
+
+/*
+template <class IT, class NT>
+SpDCCols<IT,NT>::SpDCCols(IT nRow, IT nCol, IT nTuples, const tuple<IT, IT, NT>*  tuples)
+: m(nRow), n(nCol), nnz(nTuples), splits(0)
+{
+    
+    if(nnz == 0)	// m by n matrix of complete zeros
+    {
+        dcsc = NULL;
+    }
+    else
+    {
+        IT localnzc = 1;
+#pragma omp parallel for schedule (static) default(shared) reduction(+:localnzc)
+        for(IT i=1; i<nTuples; ++i) // not scaling well, try my own version
+        {
+            if(std::get<1>(tuples[i]) != std::get<1>(tuples[i-1]))
+            {
+                ++localnzc;
+            }
+        }
+        
+        dcsc = new Dcsc<IT,NT>(nTuples,localnzc);
+        dcsc->jc[0]  = std::get<1>(tuples[0]);
+        dcsc->cp[0] = 0;
+        
+#pragma omp parallel for schedule (static)
+        for(IT i=0; i<nTuples; ++i)
+        {
+            dcsc->ir[i]  = std::get<0>(tuples[i]);
+            dcsc->numx[i] = std::get<2>(tuples[i]);
+        }
+        
+        IT jspos = 1;
+        for(IT i=1; i<nTuples; ++i) // now this loop
+        {
+            if(std::get<1>(tuples[i]) != dcsc->jc[jspos-1])
+            {
+                dcsc->jc[jspos] = std::get<1>(tuples[i]);
+                dcsc->cp[jspos++] = i;
+            }
+        }
+        dcsc->cp[jspos] = nTuples;
+    }
+}
+*/
+
 /****************************************************************************/
 /************************** PUBLIC OPERATORS ********************************/
 /****************************************************************************/
@@ -255,6 +410,53 @@ SpDCCols<IT,NT> & SpDCCols<IT,NT>::operator+= (const SpDCCols<IT,NT> & rhs)
 		cout<< "Missing feature (A+A): Use multiply with 2 instead !"<<endl;	
 	}
 	return *this;
+}
+
+template <class IT, class NT>
+template <typename _UnaryOperation, typename GlobalIT>
+SpDCCols<IT,NT>* SpDCCols<IT,NT>::PruneI(_UnaryOperation __unary_op, bool inPlace, GlobalIT rowOffset, GlobalIT colOffset)
+{
+	if(nnz > 0)
+	{
+		Dcsc<IT,NT>* ret = dcsc->PruneI (__unary_op, inPlace, rowOffset, colOffset);
+		if (inPlace)
+		{
+			nnz = dcsc->nz;
+	
+			if(nnz == 0) 
+			{	
+				delete dcsc;
+				dcsc = NULL;
+			}
+			return NULL;
+		}
+		else
+		{
+			// wrap the new pruned Dcsc into a new SpDCCols
+			SpDCCols<IT,NT>* retcols = new SpDCCols<IT, NT>();
+			retcols->dcsc = ret;
+			retcols->nnz = retcols->dcsc->nz;
+			retcols->n = n;
+			retcols->m = m;
+			return retcols;
+		}
+	}
+	else
+	{
+		if (inPlace)
+		{
+			return NULL;
+		}
+		else
+		{
+			SpDCCols<IT,NT>* retcols = new SpDCCols<IT, NT>();
+			retcols->dcsc = NULL;
+			retcols->nnz = 0;
+			retcols->n = n;
+			retcols->m = m;
+			return retcols;
+		}
+	}
 }
 
 template <class IT, class NT>
@@ -362,6 +564,19 @@ void SpDCCols<IT,NT>::EWiseScale(NT ** scaler, IT m_scaler, IT n_scaler)
 /****************************************************************************/
 /********************* PUBLIC MEMBER FUNCTIONS ******************************/
 /****************************************************************************/
+
+template <class IT, class NT>
+void SpDCCols<IT,NT>::CreateImpl(IT * _cp, IT * _jc, IT * _ir, NT * _numx, IT _nz, IT _nzc, IT _m, IT _n)
+{
+    m = _m;
+    n = _n;
+    nnz =  _nz;
+    
+    if(nnz > 0)
+        dcsc = new Dcsc<IT,NT>(_cp, _jc, _ir, _numx, _nz, _nzc, false);	// memory not owned by DCSC
+    else
+        dcsc = NULL; 
+}
 
 template <class IT, class NT>
 void SpDCCols<IT,NT>::CreateImpl(const vector<IT> & essentials)
@@ -533,6 +748,7 @@ SpDCCols<IT,NT> * SpDCCols<IT,NT>::TransposeConstPtr() const
   * Splits the matrix into two parts, simply by cutting along the columns
   * Simple algorithm that doesn't intend to split perfectly, but it should do a pretty good job
   * Practically destructs the calling object also (frees most of its memory)
+  * \todo {special case of ColSplit, to be deprecated...}
   */
 template <class IT, class NT>
 void SpDCCols<IT,NT>::Split(SpDCCols<IT,NT> & partA, SpDCCols<IT,NT> & partB) 
@@ -557,6 +773,48 @@ void SpDCCols<IT,NT>::Split(SpDCCols<IT,NT> & partA, SpDCCols<IT,NT> & partB)
 	
 	// handle destruction through assignment operator
 	*this = SpDCCols<IT, NT>();		
+}
+
+/**
+ * Splits the matrix into "parts", simply by cutting along the columns
+ * Simple algorithm that doesn't intend to split perfectly, but it should do a pretty good job
+ * Practically destructs the calling object also (frees most of its memory)
+ */
+template <class IT, class NT>
+void SpDCCols<IT,NT>::ColSplit(int parts, vector< SpDCCols<IT,NT> > & matrices)
+{
+    if(parts < 2)
+    {
+        matrices.emplace_back(*this);
+    }
+    else
+    {
+        vector<IT> cuts(parts-1);
+        for(int i=0; i< (parts-1); ++i)
+        {
+            cuts[i] = (i+1) * (n/parts);
+        }
+        if(n < parts)
+        {
+            cout<< "Matrix is too small to be splitted" << endl;
+            return;
+        }
+        vector< Dcsc<IT,NT> * > dcscs(parts, NULL);
+        
+        if(nnz != 0)
+        {
+            dcsc->ColSplit(dcscs, cuts);
+        }
+        
+        for(int i=0; i< (parts-1); ++i)
+        {
+            SpDCCols<IT,NT> matrix = SpDCCols<IT,NT>(m, (n/parts), dcscs[i]);
+            matrices.emplace_back(matrix);
+        }
+        SpDCCols<IT,NT> matrix = SpDCCols<IT,NT>(m, n-cuts[parts-2], dcscs[parts-1]);
+        matrices.emplace_back(matrix);
+    }
+    *this = SpDCCols<IT, NT>();		    // handle destruction through assignment operator
 }
 
 /** 
@@ -777,7 +1035,7 @@ ifstream & SpDCCols<IT,NT>::get(ifstream & infile)
 	infile >> tuples;
 	tuples.SortColBased();
         
-	SpDCCols<IT,NT> object(tuples, false, NULL);	
+	SpDCCols<IT,NT> object(tuples, false);
 	*this = object;
 	return infile;
 }

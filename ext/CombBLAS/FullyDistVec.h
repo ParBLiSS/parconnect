@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2015, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #ifndef _FULLY_DIST_VEC_H_
 #define _FULLY_DIST_VEC_H_
@@ -58,10 +58,12 @@ class FullyDistVec: public FullyDist<IT,NT, typename CombBLAS::disable_if< CombB
 {
 public:
 	FullyDistVec ( );
-	FullyDistVec ( IT globallen, NT initval); 
+	FullyDistVec ( IT globallen, NT initval);
 	FullyDistVec ( shared_ptr<CommGrid> grid);
+	FullyDistVec ( MPI_Comm world);
 	FullyDistVec ( shared_ptr<CommGrid> grid, IT globallen, NT initval);
 	FullyDistVec ( const FullyDistSpVec<IT, NT> & rhs ); // Sparse -> Dense conversion constructor
+    	FullyDistVec ( const DenseParVec<IT,NT> & rhs);		//!< DenseParVec->FullyDistVec conversion operator
 	FullyDistVec ( const vector<NT> & fillarr, shared_ptr<CommGrid> grid ); // initialize a FullyDistVec with a vector from each processor
 	
 
@@ -102,6 +104,16 @@ public:
 	FullyDistVec<IT,NT> & operator=(const FullyDistVec<IT,NT> & rhs);	//!< Actual assignment operator
 	FullyDistVec<IT,NT> & operator=(const FullyDistSpVec<IT,NT> & rhs);		//!< FullyDistSpVec->FullyDistVec conversion operator
 	FullyDistVec<IT,NT> & operator=(const DenseParVec<IT,NT> & rhs);		//!< DenseParVec->FullyDistVec conversion operator
+    
+    FullyDistVec<IT,NT> &  operator=(NT fixedval) // assign fixed value
+    {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for(IT i=0; i < arr.size(); ++i)
+            arr[i] = fixedval;
+        return *this;
+    }
 	FullyDistVec<IT,NT> operator() (const FullyDistVec<IT,IT> & ri) const;	//<! subsref
 	
 	//! like operator=, but instead of making a deep copy it just steals the contents. 
@@ -122,6 +134,11 @@ public:
 	}
 
 	void Set(const FullyDistSpVec< IT,NT > & rhs);
+    template <class NT1, typename _BinaryOperationIdx, typename _BinaryOperationVal>
+    void GSet (const FullyDistSpVec<IT,NT1> & spVec, _BinaryOperationIdx __binopIdx, _BinaryOperationVal __binopVal, MPI_Win win);
+    template <class NT1, typename _BinaryOperationIdx>
+    FullyDistSpVec<IT,NT> GGet (const FullyDistSpVec<IT,NT1> & spVec, _BinaryOperationIdx __binopIdx, NT nullValue);
+
 	void iota(IT globalsize, NT first);
 	void RandPerm();	// randomly permute the vector
 	FullyDistVec<IT,IT> sort();	// sort and return the permutation
@@ -135,6 +152,8 @@ public:
 	template <typename _Predicate>
 	FullyDistSpVec<IT,NT> Find(_Predicate pred) const;	//!< Return the elements for which pred is true
 
+    FullyDistSpVec<IT,NT> Find(NT val) const;	//!< Return the elements val is found
+    
 	template <typename _Predicate>
 	FullyDistVec<IT,IT> FindInds(_Predicate pred) const;	//!< Return the indices where pred is true
 
@@ -154,7 +173,7 @@ public:
 		#ifdef _OPENMP
 		#pragma omp parallel for
 		#endif
-		for(IT i=0; (unsigned)i < arr.size(); ++i)
+		for(IT i=0; i < arr.size(); ++i)
 			arr[i] = __binary_op(arr[i], i + offset);
 	}
 
@@ -219,11 +238,14 @@ public:
 	void DebugPrint();
 	shared_ptr<CommGrid> getcommgrid() const { return commGrid; }
 	
+    pair<IT, NT> MinElement() const; // returns <index, value> pair of global minimum
+    
+    
 	template <typename _BinaryOperation>
-	NT Reduce(_BinaryOperation __binary_op, NT identity);	//! Reduce can be used to implement max_element, for instance
+	NT Reduce(_BinaryOperation __binary_op, NT identity) const;	//! Reduce can be used to implement max_element, for instance
 
 	template <typename OUT, typename _BinaryOperation, typename _UnaryOperation>
-	OUT Reduce(_BinaryOperation __binary_op, OUT default_val, _UnaryOperation __unary_op);
+	OUT Reduce(_BinaryOperation __binary_op, OUT default_val, _UnaryOperation __unary_op) const;
 
 	void SelectCandidates(double nver);
 
@@ -266,12 +288,26 @@ private:
 	template <typename RET, typename IU, typename NU1, typename NU2, typename _BinaryOperation, typename _BinaryPredicate>
 	friend FullyDistSpVec<IU,RET> 
 	EWiseApply (const FullyDistSpVec<IU,NU1> & V, const FullyDistVec<IU,NU2> & W , _BinaryOperation _binary_op, _BinaryPredicate _doOp, bool allowVNulls, NU1 Vzero, const bool useExtendedBinOp);
+    
+    template <typename RET, typename IU, typename NU1, typename NU2, typename _BinaryOperation, typename _BinaryPredicate>
+    friend FullyDistSpVec<IU,RET>
+    EWiseApply_threaded (const FullyDistSpVec<IU,NU1> & V, const FullyDistVec<IU,NU2> & W , _BinaryOperation _binary_op, _BinaryPredicate _doOp, bool allowVNulls, NU1 Vzero, const bool useExtendedBinOp);
+
 
 	template <typename IU>
 	friend void RenameVertices(DistEdgeList<IU> & DEL);
 	
 	template <typename IU, typename NU>
 	friend FullyDistVec<IU,NU> Concatenate ( vector< FullyDistVec<IU,NU> > & vecs);
+    
+    template <typename IU, typename NU>
+    friend void Augment (FullyDistVec<int64_t, int64_t>& mateRow2Col, FullyDistVec<int64_t, int64_t>& mateCol2Row,
+                         FullyDistVec<int64_t, int64_t>& parentsRow, FullyDistVec<int64_t, int64_t>& leaves);
+    template <class IU, class DER>
+    friend SpParMat<IU, bool, DER> PermMat (const FullyDistVec<IU,IU> & ri, const IU ncol);
+    
+    
+    friend void maximumMatching(SpParMat < int64_t, bool, SpDCCols<int32_t,bool> > & A, FullyDistVec<int64_t, int64_t>& mateRow2Col,FullyDistVec<int64_t, int64_t>& mateCol2Row);
 };
 
 #include "FullyDistVec.cpp"

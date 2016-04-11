@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
- Copyright (c) 2011, Aydin Buluc
+ Copyright (c) 2010-2015, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -73,6 +73,7 @@ public:
 	
 	// Constructors
 	SpParMat ();
+    	SpParMat (MPI_Comm world); 	// ABAB: there is risk that any integer would call this constructor due to MPICH representation
 	SpParMat (shared_ptr<CommGrid> grid);
 	SpParMat (DER * myseq, shared_ptr<CommGrid> grid);
 		
@@ -97,7 +98,6 @@ public:
 	void FreeMemory();
 	void EWiseMult (const SpParMat< IT,NT,DER >  & rhs, bool exclude);
 	void EWiseScale (const DenseParMat<IT,NT> & rhs);
-	void DimScale (const DenseParVec<IT,NT> & v, Dim dim);	//! deprecated: use DimApply instead
 	void Find (FullyDistVec<IT,IT> & , FullyDistVec<IT,IT> & , FullyDistVec<IT,NT> & ) const;
 	void Find (FullyDistVec<IT,IT> & , FullyDistVec<IT,IT> & ) const;
 
@@ -105,23 +105,35 @@ public:
 	void DimApply(Dim dim, const FullyDistVec<IT, NT>& v, _BinaryOperation __binary_op);
 
 	template <typename _BinaryOperation, typename _UnaryOperation >	
-	DenseParVec<IT,NT> Reduce(Dim dim, _BinaryOperation __binary_op, NT id, _UnaryOperation __unary_op) const;
+	DenseParVec<IT,NT> Reduce(Dim dim, _BinaryOperation __binary_op, NT id, _UnaryOperation __unary_op) const;  // deprecated?
 
 	template <typename _BinaryOperation>	
-	DenseParVec<IT,NT> Reduce(Dim dim, _BinaryOperation __binary_op, NT id) const;
+	DenseParVec<IT,NT> Reduce(Dim dim, _BinaryOperation __binary_op, NT id) const;  // deprecated?
 
 	template <typename VT, typename _BinaryOperation, typename _UnaryOperation >	
-	void Reduce(DenseParVec<IT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id, _UnaryOperation __unary_op) const;
+	void Reduce(DenseParVec<IT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id, _UnaryOperation __unary_op) const; // deprecated?
 
 	template <typename VT, typename _BinaryOperation>	
-	void Reduce(DenseParVec<IT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id) const;
+	void Reduce(DenseParVec<IT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id) const; // deprecated?
 
+    template <typename VT, typename GIT, typename _BinaryOperation, typename _UnaryOperation >
+	void Reduce(FullyDistVec<GIT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id, _UnaryOperation __unary_op, MPI_Op mympiop) const;
+    
 	template <typename VT, typename GIT, typename _BinaryOperation, typename _UnaryOperation >	
 	void Reduce(FullyDistVec<GIT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id, _UnaryOperation __unary_op) const;
 
 	template <typename VT, typename GIT, typename _BinaryOperation>	
 	void Reduce(FullyDistVec<GIT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id) const;
+    
+    template <typename VT, typename GIT, typename _BinaryOperation>
+	void Reduce(FullyDistVec<GIT,VT> & rvec, Dim dim, _BinaryOperation __binary_op, VT id, MPI_Op mympiop) const;
 
+    
+    template <typename VT, typename GIT, typename _BinaryOperation>
+    void MaskedReduce(FullyDistVec<GIT,VT> & rvec, FullyDistSpVec<GIT,VT> & mask, Dim dim, _BinaryOperation __binary_op, VT id, bool exclude=false) const;
+    template <typename VT, typename GIT, typename _BinaryOperation, typename _UnaryOperation >
+    void MaskedReduce(FullyDistVec<GIT,VT> & rvec, FullyDistSpVec<GIT,VT> & mask, Dim dim, _BinaryOperation __binary_op, VT id, _UnaryOperation __unary_op, bool exclude=false) const;
+    
 	template <typename _UnaryOperation>
 	void Apply(_UnaryOperation __unary_op)
 	{
@@ -135,7 +147,23 @@ public:
 	void ActivateThreading(int numsplits);	//<! As of version 1.2, only works with boolean matrices 
 
 	template <typename _UnaryOperation>
-	SpParMat<IT,NT,DER> Prune(_UnaryOperation __unary_op, bool inPlace = true) //<! Prune any nonzero entries for which the __unary_op evaluates to true	
+	SpParMat<IT,NT,DER> PruneI(_UnaryOperation __unary_op, bool inPlace = true) //<! Prune any nonzero entries based on both row/column indices and value
+	{
+		IT grow=0, gcol=0; 
+		GetPlaceInGlobalGrid(grow, gcol);
+		if (inPlace)
+		{
+			spSeq->PruneI(__unary_op, inPlace, grow, gcol);
+			return SpParMat<IT,NT,DER>(); // return blank to match signature
+		}
+		else
+		{
+			return SpParMat<IT,NT,DER>(spSeq->PruneI(__unary_op, inPlace, grow, gcol), commGrid);
+		}
+	}
+
+	template <typename _UnaryOperation>
+	SpParMat<IT,NT,DER> Prune(_UnaryOperation __unary_op, bool inPlace = true) //<! Prune any nonzero entries for which the __unary_op evaluates to true (solely based on value)
 	{
 		if (inPlace)
 		{
@@ -183,10 +211,13 @@ public:
 	public:
 		NT getNoNum(IT row, IT col) { return static_cast<NT>(1); }
 		void binaryfill(FILE * rFile, IT & row, IT & col, NT & val) 
-		{ 
-			fread(&row, sizeof(IT), 1,rFile);
-			fread(&col, sizeof(IT), 1,rFile);
-			fread(&val, sizeof(NT), 1,rFile);
+		{
+			if (fread(&row, sizeof(IT), 1,rFile) != 1)
+				cout << "binaryfill(): error reading row index" << endl;
+			if (fread(&col, sizeof(IT), 1,rFile) != 1)
+				cout << "binaryfill(): error reading col index" << endl;
+			if (fread(&val, sizeof(NT), 1,rFile) != 1)
+				cout << "binaryfill(): error reading value" << endl;
 			return; 
 		}
 		size_t entrylength() { return 2*sizeof(IT)+sizeof(NT); }
@@ -206,6 +237,7 @@ public:
 		}
 	};
 	
+    void ParallelReadMM (const string & filename);
 	template <class HANDLER>
 	void ReadDistribute (const string & filename, int master, bool nonum, HANDLER handler, bool transpose = false, bool pario = false);
 	void ReadDistribute (const string & filename, int master, bool nonum=false, bool pario = false) 
@@ -225,6 +257,7 @@ public:
 	typename DER::LocalIT getlocalcols() const { return spSeq->getncol();} 
 	typename DER::LocalIT getlocalnnz() const { return spSeq->getnnz(); }
 	DER & seq() { return (*spSeq); }
+	DER * seqptr() { return spSeq; }
 
 	//! Friend declarations
 	template <typename SR, typename NUO, typename UDERO, typename IU, typename NU1, typename NU2, typename UDER1, typename UDER2> 
@@ -292,6 +325,8 @@ public:
 private:
 	void SparseCommon(vector< vector < tuple<IT,IT,NT> > > & data, IT locsize, IT total_m, IT total_n, bool SumDuplicates = false);
 	int Owner(IT total_m, IT total_n, IT grow, IT gcol, IT & lrow, IT & lcol) const;
+	
+	void GetPlaceInGlobalGrid(IT& rowOffset, IT& colOffset) const;
 	
 	void HorizontalSend(IT * & rows, IT * & cols, NT * & vals, IT * & temprows, IT * & tempcols, NT * & tempvals, vector < tuple <IT,IT,NT> > & localtuples,
 						int * rcurptrs, int * rdispls, IT buffperrowneigh, int rowneighs, int recvcount, IT m_perproc, IT n_perproc, int rankinrow);

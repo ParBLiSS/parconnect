@@ -1,8 +1,30 @@
+/****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.1 -------------------------------------------------*/
-/* date: 12/25/2010 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
+/*
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #include "SpTuples.h"
 #include "SpParHelper.h"
@@ -24,10 +46,14 @@ SpTuples<IT,NT>::SpTuples(int64_t size, IT nRow, IT nCol)
 }
 
 template <class IT,class NT>
-SpTuples<IT,NT>::SpTuples (int64_t size, IT nRow, IT nCol, tuple<IT, IT, NT> * mytuples)
+SpTuples<IT,NT>::SpTuples (int64_t size, IT nRow, IT nCol, tuple<IT, IT, NT> * mytuples, bool sorted)
 :tuples(mytuples), m(nRow), n(nCol), nnz(size)
 {
-	SortColBased();
+    if(!sorted)
+    {
+        SortColBased();
+    }
+    
 }
 
 /**
@@ -77,13 +103,6 @@ SpTuples<IT,NT>::SpTuples (int64_t maxnnz, IT nRow, IT nCol, vector<IT> & edges,
 		cnz = j;
 	}
 
-	int64_t totdup = 0; int64_t totself = 0; 
-	MPI_Allreduce( &dup, &totdup, 1, MPIType<int64_t>(), MPI_SUM, MPI_COMM_WORLD);
-	MPI_Allreduce( &self, &totself, 1, MPIType<int64_t>(), MPI_SUM, MPI_COMM_WORLD);
-	ostringstream os;
-	//os << "Duplicates removed (or summed): " << totdup << " and self-loops removed: " <<  totself << endl;  
-	SpParHelper::Print(os.str());
-
 	tuple<IT, IT, NT> * ntuples = new tuple<IT,IT,NT>[nnz];
 	int64_t j = 0;
 	for(int64_t i=0; i<maxnnz; ++i)
@@ -94,10 +113,7 @@ SpTuples<IT,NT>::SpTuples (int64_t maxnnz, IT nRow, IT nCol, vector<IT> & edges,
 		}
 	}
 	assert(j == nnz);
-
-  if(maxnnz > 0)      //The memory was allocated if maxnnz > 0
-    delete [] tuples;
-
+	delete [] tuples;
 	tuples = ntuples;
 }
 
@@ -120,7 +136,7 @@ SpTuples<IT,NT>::SpTuples (int64_t size, IT nRow, IT nCol, StackEntry<NT, pair<I
 		colindex(i) = multstack[i].key.first;
 		rowindex(i) = multstack[i].key.second;
 		numvalue(i) = multstack[i].value;
-	}
+    }
 	delete [] multstack;
 }
 
@@ -130,7 +146,8 @@ SpTuples<IT,NT>::~SpTuples()
 {
 	if(nnz > 0)
 	{
-		delete [] tuples;
+		//delete [] tuples;
+        ::operator delete(tuples);
 	}
 }
 
@@ -221,9 +238,9 @@ void SpTuples<IT,NT>::RemoveDuplicates(BINFUNC BinOp)
 	
 		for(IT i=1; i< nnz; ++i)
         	{
-			if((get<0>(summed.back()) == get<0>(tuples[i])) && (get<1>(summed.back()) == get<1>(tuples[i])))
+                if((joker::get<0>(summed.back()) == joker::get<0>(tuples[i])) && (joker::get<1>(summed.back()) == joker::get<1>(tuples[i])))
 			{
-				get<2>(summed.back()) = BinOp(get<2>(summed.back()), get<2>(tuples[i]));
+				joker::get<2>(summed.back()) = BinOp(joker::get<2>(summed.back()), joker::get<2>(tuples[i]));
 			}
 			else
 			{

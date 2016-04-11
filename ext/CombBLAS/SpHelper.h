@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #ifndef _SP_HELPER_H_
 #define _SP_HELPER_H_
@@ -46,6 +46,63 @@ class Dcsc;
 class SpHelper
 {
 public:
+    
+    template <typename IT1, typename NT1, typename IT2, typename NT2>
+    static void push_to_vectors(vector<IT1> & rows, vector<IT1> & cols, vector<NT1> & vals, IT2 ii, IT2 jj, NT2 vv, int symmetric)
+    {
+        ii--;  /* adjust from 1-based to 0-based */
+        jj--;
+        rows.push_back(ii);
+        cols.push_back(jj);
+        vals.push_back(vv);
+        if(symmetric && ii != jj)
+        {
+            rows.push_back(jj);
+            cols.push_back(ii);
+            vals.push_back(vv);
+        }
+    }
+    
+    template <typename IT1, typename NT1>
+    static void ProcessLines(vector<IT1> & rows, vector<IT1> & cols, vector<NT1> & vals, vector<string> & lines, int symmetric, int type)
+    {
+        if(type == 0)   // real
+        {
+            int64_t ii, jj;
+            double vv;
+            for (auto itr=lines.begin(); itr != lines.end(); ++itr)
+            {
+                // string::c_str() -> Returns a pointer to an array that contains a null-terminated sequence of characters (i.e., a C-string)
+                sscanf(itr->c_str(), "%lld %lld %lg", &ii, &jj, &vv);
+                SpHelper::push_to_vectors(rows, cols, vals, ii, jj, vv, symmetric);
+            }
+        }
+        else if(type == 1) // integer
+        {
+            int64_t ii, jj, vv;
+            for (auto itr=lines.begin(); itr != lines.end(); ++itr)
+            {
+                sscanf(itr->c_str(), "%lld %lld %lld", &ii, &jj, &vv);
+                SpHelper::push_to_vectors(rows, cols, vals, ii, jj, vv, symmetric);
+            }
+        }
+        else if(type == 2) // pattern
+        {
+            int64_t ii, jj;
+            for (auto itr=lines.begin(); itr != lines.end(); ++itr)
+            {
+                sscanf(itr->c_str(), "%lld %lld", &ii, &jj);
+                SpHelper::push_to_vectors(rows, cols, vals, ii, jj, 1, symmetric);
+            }
+        }
+        else
+        {
+            cout << "COMBBLAS: Unrecognized matrix market scalar type" << endl;
+        }
+        vector<string>().swap(lines);
+    }
+
+
 	template <typename T>
 	static const T * p2a (const std::vector<T> & v)   // pointer to array
 	{

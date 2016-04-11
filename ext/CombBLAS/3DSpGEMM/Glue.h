@@ -1,0 +1,9 @@
+extern double comm_bcast;
+extern double comm_reduce;
+extern double comm_split;
+extern double comp_summa;
+extern double comp_reduce;
+extern double comp_reduce_layer;
+extern double comp_result;
+extern double comp_trans;
+extern double comp_split;

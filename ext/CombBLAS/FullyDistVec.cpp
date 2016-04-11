@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2015, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #include "FullyDistVec.h"
 #include "FullyDistSpVec.h"
@@ -43,9 +43,15 @@ FullyDistVec<IT, NT>::FullyDistVec (IT globallen, NT initval)
 	arr.resize(MyLocLength(), initval);
 }
 
+
 template <class IT, class NT>
 FullyDistVec<IT, NT>::FullyDistVec ( shared_ptr<CommGrid> grid)
 : FullyDist<IT,NT,typename CombBLAS::disable_if< CombBLAS::is_boolean<NT>::value, NT >::type>(grid)
+{ }
+
+template <class IT, class NT>
+FullyDistVec<IT, NT>::FullyDistVec (MPI_Comm world)
+: FullyDist<IT,NT,typename CombBLAS::disable_if< CombBLAS::is_boolean<NT>::value, NT >::type>(world)
 { }
 
 template <class IT, class NT>
@@ -57,6 +63,14 @@ FullyDistVec<IT, NT>::FullyDistVec ( shared_ptr<CommGrid> grid, IT globallen, NT
 
 template <class IT, class NT>
 FullyDistVec<IT,NT>::FullyDistVec (const FullyDistSpVec<IT,NT> & rhs)		// Conversion copy-constructor
+: FullyDist<IT,NT,typename CombBLAS::disable_if< CombBLAS::is_boolean<NT>::value, NT >::type>(rhs.commGrid,rhs.glen)
+{
+	*this = rhs;
+}
+
+template <class IT, class NT>
+FullyDistVec<IT,NT>::FullyDistVec (const DenseParVec<IT,NT> & rhs)		// Conversion copy-constructor
+: FullyDist<IT,NT,typename CombBLAS::disable_if< CombBLAS::is_boolean<NT>::value, NT >::type>(rhs.commGrid)
 {
 	*this = rhs;
 }
@@ -140,8 +154,30 @@ FullyDistVec<IT, NT>::FullyDistVec ( const vector<NT> & fillarr, shared_ptr<Comm
 
 
 template <class IT, class NT>
+pair<IT, NT> FullyDistVec<IT,NT>::MinElement() const
+{
+   
+    
+    auto it = min_element(arr.begin(), arr.end());
+    NT localMin = *it;
+    NT globalMin;
+    MPI_Allreduce( &localMin, &globalMin, 1, MPIType<NT>(), MPI_MIN, commGrid->GetWorld());
+    
+    IT localMinIdx = TotalLength();
+    if(globalMin==localMin)
+    {
+        localMinIdx = distance(arr.begin(), it) + LengthUntil(); 
+    }
+    IT globalMinIdx;
+    MPI_Allreduce( &localMinIdx, &globalMinIdx, 1, MPIType<IT>(), MPI_MIN, commGrid->GetWorld()); // it can be MPI_MAX or anything
+
+    return make_pair(globalMinIdx, globalMin);
+}
+
+
+template <class IT, class NT>
 template <typename _BinaryOperation>
-NT FullyDistVec<IT,NT>::Reduce(_BinaryOperation __binary_op, NT identity)
+NT FullyDistVec<IT,NT>::Reduce(_BinaryOperation __binary_op, NT identity) const
 {
 	// std::accumulate returns identity for empty sequences
 	NT localsum = std::accumulate( arr.begin(), arr.end(), identity, __binary_op);
@@ -153,7 +189,7 @@ NT FullyDistVec<IT,NT>::Reduce(_BinaryOperation __binary_op, NT identity)
 
 template <class IT, class NT>
 template <typename OUT, typename _BinaryOperation, typename _UnaryOperation>
-OUT FullyDistVec<IT,NT>::Reduce(_BinaryOperation __binary_op, OUT default_val, _UnaryOperation __unary_op)
+OUT FullyDistVec<IT,NT>::Reduce(_BinaryOperation __binary_op, OUT default_val, _UnaryOperation __unary_op) const
 {
 	// std::accumulate returns identity for empty sequences
 	OUT localsum = default_val; 
@@ -271,7 +307,7 @@ FullyDistVec< IT,NT > &  FullyDistVec<IT,NT>::operator=(const DenseParVec< IT,NT
 		if(rhs.diagonal)
 		{
 			int proccols = commGrid->GetGridCols();	
-        		IT n_perproc = rhs.getLocalLength() / proccols;
+            IT n_perproc = rhs.getLocalLength() / proccols;
 			sendcnts = new int[proccols];
 			fill(sendcnts, sendcnts+proccols-1, n_perproc);
 			sendcnts[proccols-1] = rhs.getLocalLength() - (n_perproc * (proccols-1));
@@ -280,7 +316,7 @@ FullyDistVec< IT,NT > &  FullyDistVec<IT,NT>::operator=(const DenseParVec< IT,NT
 		}
 
 		int rowroot = commGrid->GetDiagOfProcRow();
-		MPI_Scatterv(&(rhs.arr[0]),sendcnts, dpls, MPIType<NT>(), &(arr[0]), arr.size(), MPIType<NT>(),rowroot, commGrid->GetRowWorld());
+		MPI_Scatterv((void*) &(rhs.arr[0]),sendcnts, dpls, MPIType<NT>(), &(arr[0]), arr.size(), MPIType<NT>(),rowroot, commGrid->GetRowWorld());
 	}
 	return *this;
 }
@@ -314,18 +350,6 @@ FullyDistVec< IT,NT > &  FullyDistVec<IT,NT>::operator+=(const FullyDistSpVec< I
 	return *this;
 }
 
-template <class IT, class NT>
-void FullyDistVec<IT,NT>::Set(const FullyDistSpVec< IT,NT > & rhs)		
-{
-	IT spvecsize = rhs.getlocnnz();
-	#ifdef _OPENMP
-	#pragma omp parallel for
-	#endif
-	for(IT i=0; i< spvecsize; ++i)
-	{
-		arr[rhs.ind[i]] = rhs.num[i];
-	}
-}
 
 
 template <class IT, class NT>
@@ -493,6 +517,26 @@ FullyDistSpVec<IT,NT> FullyDistVec<IT,NT>::Find(_Predicate pred) const
 	return found;	
 }
 
+
+//! Retain a sparse vector with indices where the supplied value is found
+template <class IT, class NT>
+FullyDistSpVec<IT,NT> FullyDistVec<IT,NT>::Find(NT val) const
+{
+    FullyDistSpVec<IT,NT> found(commGrid);
+    size_t size = arr.size();
+    for(size_t i=0; i<size; ++i)
+    {
+        if(arr[i]==val)
+        {
+            found.ind.push_back( (IT) i);
+            found.num.push_back(val);
+        }
+    }
+    found.glen = glen;
+    return found;	
+}
+
+
 template <class IT, class NT>
 template <class HANDLER>
 ifstream& FullyDistVec<IT,NT>::ReadDistribute (ifstream& infile, int master, HANDLER handler)
@@ -597,7 +641,7 @@ void FullyDistVec<IT,NT>::DebugPrint()
 	MPI_File_set_view(thefile, int64_t(lengthuntil * sizeof(NT)), MPIType<NT>(), MPIType<NT>(), native, MPI_INFO_NULL);
 
 	IT count = LocArrSize();	
-	MPI_File_write(thefile, &(arr[0]), count, MPIType<NT>(), NULL);
+	MPI_File_write(thefile, &(arr[0]), count, MPIType<NT>(), MPI_STATUS_IGNORE);
 	MPI_File_close(&thefile);
 	
 	// Now let processor-0 read the file and print
@@ -679,6 +723,9 @@ void FullyDistVec<IT,NT>::EWiseApply(const FullyDistVec<IT,NT2> & other, _Binary
 	}
 }	
 
+
+// Note (Ariful): multithreded implemented only when applyNulls=false.
+// TODO: employ multithreding when applyNulls=true
 template <class IT, class NT>
 template <typename _BinaryOperation, typename _BinaryPredicate, class NT2>
 void FullyDistVec<IT,NT>::EWiseApply(const FullyDistSpVec<IT,NT2> & other, _BinaryOperation __binary_op, _BinaryPredicate _do_op, bool applyNulls, NT2 nullValue, const bool useExtendedBinOp)
@@ -715,13 +762,22 @@ void FullyDistVec<IT,NT>::EWiseApply(const FullyDistSpVec<IT,NT2> & other, _Bina
 			}
 			else // scan the sparse vector only
 			{
-				while (otherInd < other.ind.end())
+                /*
+                for(otherInd = other.ind.begin(); otherInd < other.ind.end(); otherInd++, otherNum++)
 				{
 					if (_do_op(arr[*otherInd], *otherNum, false, false))
 						arr[*otherInd] = __binary_op(arr[*otherInd], *otherNum, false, false);
-					otherInd++;
-					otherNum++;
-				}
+				}*/
+                
+                IT spsize = other.ind.size();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+                for(IT i=0; i< spsize; i++)
+                {
+                    if (_do_op(arr[other.ind[i]], other.num[i], false, false))
+                        arr[other.ind[i]] = __binary_op(arr[other.ind[i]], other.num[i], false, false);
+                }
 			}
 		}
 	}
@@ -1000,6 +1056,7 @@ FullyDistVec<IT,NT> FullyDistVec<IT,NT>::operator() (const FullyDistVec<IT,IT> &
 	return Indexed;
 }
 
+
 template <class IT, class NT>
 void FullyDistVec<IT,NT>::PrintInfo(string vectorname) const
 {
@@ -1007,3 +1064,191 @@ void FullyDistVec<IT,NT>::PrintInfo(string vectorname) const
 	if (commGrid->GetRank() == 0)		
 		cout << "As a whole, " << vectorname << " has length " << totl << endl; 
 }
+
+
+
+
+
+template <class IT, class NT>
+void FullyDistVec<IT,NT>::Set(const FullyDistSpVec< IT,NT > & other)
+{
+    if(*(commGrid) == *(other.commGrid))
+    {
+        if(glen != other.glen)
+        {
+            cerr << "Vector dimensions don't match (" << glen << " vs " << other.glen << ") for FullyDistVec::Set\n";
+            MPI_Abort(MPI_COMM_WORLD, GRIDMISMATCH);
+        }
+        else
+        {
+            
+            IT spvecsize = other.getlocnnz();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for(IT i=0; i< spvecsize; ++i)
+            {
+                arr[other.ind[i]] = other.num[i];
+            }
+        }
+    }
+    else
+    {
+        cout << "Grids are not comparable for Set" << endl;
+        MPI_Abort(MPI_COMM_WORLD, GRIDMISMATCH);
+    }
+}
+
+
+
+
+
+
+
+// General purpose set operation on dense vector by a sparse vector
+
+
+template <class IT, class NT>
+template <class NT1, typename _BinaryOperationIdx, typename _BinaryOperationVal>
+void FullyDistVec<IT,NT>::GSet (const FullyDistSpVec<IT,NT1> & spVec, _BinaryOperationIdx __binopIdx, _BinaryOperationVal __binopVal, MPI_Win win)
+{
+    if(*(commGrid) != *(spVec.commGrid))
+    {
+        cout << "Grids are not comparable for GSet" << endl;
+        MPI_Abort(MPI_COMM_WORLD, GRIDMISMATCH);
+    }
+    
+    IT spVecSize = spVec.getlocnnz();
+    if(spVecSize==0) return;
+    
+    
+    MPI_Comm World = commGrid->GetWorld();
+    int nprocs = commGrid->GetSize();
+    int myrank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+
+    vector< vector< NT > > datsent(nprocs);
+    vector< vector< IT > > indsent(nprocs);
+    IT lengthUntil = spVec.LengthUntil();
+   
+    for(IT k=0; k < spVecSize; ++k)
+    {
+        IT locind;
+        // get global index of the dense vector from the value. Most often a select operator.
+        // If the first operand is selected, then invert; otherwise, EwiseApply.
+        IT globind = __binopIdx(spVec.num[k], spVec.ind[k] + lengthUntil);
+        int owner = Owner(globind, locind); // get local index
+        NT val = __binopVal(spVec.num[k], spVec.ind[k] + lengthUntil);
+        if(globind < glen) // prevent index greater than size of the composed vector
+        {
+            datsent[owner].push_back(val);
+            indsent[owner].push_back(locind);   // so that we don't need no correction at the recipient
+        }
+    }
+    
+    
+    for(int j = 0; j < datsent[myrank].size(); ++j)	// directly set local entries
+    {
+        arr[indsent[myrank][j]] = datsent[myrank][j];
+    }
+    
+    
+    //MPI_Win win;
+    //MPI_Win_create(&arr[0], LocArrSize() * sizeof(NT), sizeof(NT), MPI_INFO_NULL, World, &win);
+    //MPI_Win_fence(0, win);
+    for(int i=0; i<nprocs; ++i)
+    {
+        if(i!=myrank)
+        {
+            MPI_Win_lock(MPI_LOCK_SHARED,i,MPI_MODE_NOCHECK,win);
+            for(int j = 0; j < datsent[i].size(); ++j)
+            {
+                MPI_Put(&datsent[i][j], 1, MPIType<NT>(), i, indsent[i][j], 1, MPIType<NT>(), win);
+            }
+            MPI_Win_unlock(i, win);
+        }
+    }
+    //MPI_Win_fence(0, win);
+    //MPI_Win_free(&win);
+
+}
+
+
+
+// General purpose get operation on dense vector by a sparse vector
+// Get the element of the dense vector indexed by the value of the sparse vector
+// invert and get might not work in the presence of repeated values
+
+template <class IT, class NT>
+template <class NT1, typename _BinaryOperationIdx>
+ FullyDistSpVec<IT,NT> FullyDistVec<IT,NT>::GGet (const FullyDistSpVec<IT,NT1> & spVec, _BinaryOperationIdx __binopIdx, NT nullValue)
+{
+    if(*(commGrid) != *(spVec.commGrid))
+    {
+        cout << "Grids are not comparable for GGet" << endl;
+        MPI_Abort(MPI_COMM_WORLD, GRIDMISMATCH);
+    }
+    
+    MPI_Comm World = commGrid->GetWorld();
+    int nprocs = commGrid->GetSize();
+    int myrank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    
+    
+    vector< vector< NT > > spIdx(nprocs);
+    vector< vector< IT > > indsent(nprocs);
+    IT lengthUntil = spVec.LengthUntil();
+    IT spVecSize = spVec.getlocnnz();
+    
+    FullyDistSpVec<IT, NT> res(spVec.commGrid, spVec.TotalLength());
+    res.ind.resize(spVecSize);
+    res.num.resize(spVecSize);
+    
+    
+    for(IT k=0; k < spVecSize; ++k)
+    {
+        IT locind;
+        // get global index of the dense vector from the value. Most often a select operator.
+        // If the first operand is selected, then invert; otherwise, EwiseApply.
+        IT globind = __binopIdx(spVec.num[k], spVec.ind[k] + lengthUntil);
+        int owner = Owner(globind, locind); // get local index
+        //NT val = __binopVal(spVec.num[k], spVec.ind[k] + lengthUntil);
+        if(globind < glen) // prevent index greater than size of the composed vector
+        {
+            spIdx[owner].push_back(k); // position of spVec
+            indsent[owner].push_back(locind);   // so that we don't need no correction at the recipient
+        }
+        else
+            res.num[k] = nullValue;
+        res.ind[k] = spVec.ind[k];
+    }
+    
+    
+    for(int j = 0; j < indsent[myrank].size(); ++j)	// directly get local entries
+    {
+        res.num[spIdx[myrank][j]] = arr[indsent[myrank][j]];
+    }
+    
+    
+    MPI_Win win;
+    MPI_Win_create(&arr[0], LocArrSize() * sizeof(NT), sizeof(NT), MPI_INFO_NULL, World, &win);
+    for(int i=0; i<nprocs; ++i)
+    {
+        if(i!=myrank)
+        {
+            MPI_Win_lock(MPI_LOCK_SHARED,i,MPI_MODE_NOCHECK,win);
+            for(int j = 0; j < indsent[i].size(); ++j)
+            {
+                MPI_Get(&res.num[spIdx[i][j]], 1, MPIType<NT>(), i, indsent[i][j], 1, MPIType<NT>(), win);
+            }
+            MPI_Win_unlock(i, win);
+        }
+    }
+    MPI_Win_free(&win);
+    
+    return res;
+}
+
+
+

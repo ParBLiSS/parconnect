@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 
 template<typename KEY, typename VAL, typename IT>
@@ -466,17 +466,17 @@ void SpParHelper::SetWindows(MPI_Comm & comm1d, const SpMat< IT,NT,DER > & Matri
 
 inline void SpParHelper::LockWindows(int ownind, vector<MPI_Win> & arrwin)
 {
-	for(unsigned int i=0; i< arrwin.size(); ++i)
+	for(vector<MPI_Win>::iterator itr = arrwin.begin(); itr != arrwin.end(); ++itr)
 	{
-		MPI_Win_lock(MPI_LOCK_SHARED, ownind, 0, arrwin[i]);
+		MPI_Win_lock(MPI_LOCK_SHARED, ownind, 0, *itr);
 	}
 }
 
 inline void SpParHelper::UnlockWindows(int ownind, vector<MPI_Win> & arrwin) 
 {
-	for(unsigned int i=0; i< arrwin.size(); ++i)
+	for(vector<MPI_Win>::iterator itr = arrwin.begin(); itr != arrwin.end(); ++itr)
 	{
-		MPI_Win_unlock( ownind, arrwin[i]);
+		MPI_Win_unlock( ownind, *itr);
 	}
 }
 
@@ -559,13 +559,25 @@ void SpParHelper::GetSetSizes(const SpMat<IT,NT,DER> & Matrix, IT ** & sizes, MP
 inline void SpParHelper::PrintFile(const string & s, const string & filename)
 {
 	int myrank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 	if(myrank == 0)
 	{
 		ofstream out(filename.c_str(), std::ofstream::app);
 		out << s;
 		out.close();
 	}
+}
+
+inline void SpParHelper::PrintFile(const string & s, const string & filename, MPI_Comm & world)
+{
+    int myrank;
+    MPI_Comm_rank(world, &myrank);
+    if(myrank == 0)
+    {
+        ofstream out(filename.c_str(), std::ofstream::app);
+        out << s;
+        out.close();
+    }
 }
 
 
@@ -578,6 +590,93 @@ inline void SpParHelper::Print(const string & s)
 		cout << s;
 	}
 }
+
+inline void SpParHelper::Print(const string & s, MPI_Comm & world)
+{
+    int myrank;
+    MPI_Comm_rank(world, &myrank);
+    if(myrank == 0)
+    {
+        cout << s;
+    }
+}
+
+
+inline void SpParHelper::check_newline(int *bytes_read, int bytes_requested, char *buf)
+{
+    if ((*bytes_read) < bytes_requested) {
+        // fewer bytes than expected, this means EOF
+        if (buf[(*bytes_read) - 1] != '\n') {
+            // doesn't terminate with a newline, add one to prevent infinite loop later
+            buf[(*bytes_read) - 1] = '\n';
+            cout << "Error in Matrix Market format, appending missing newline at end of file" << endl;
+            (*bytes_read)++;
+        }
+    }
+}
+
+
+inline bool SpParHelper::FetchBatch(MPI_File & infile, MPI_Offset & curpos, MPI_Offset end_fpos, bool firstcall, vector<string> & lines, int myrank)
+{
+    size_t bytes2fetch = ONEMILLION;    // we might read more than needed but no problem as we won't process them
+    char * buf = new char[bytes2fetch];
+    char * originalbuf = buf;   // so that we can delete it later because "buf" will move
+    MPI_Status status;
+    int bytes_read;
+    if(firstcall)
+    {
+        curpos -= 1;    // first byte is to check whether we started at the beginning of a line
+        bytes2fetch += 1;
+    }
+    
+    MPI_File_read_at(infile, curpos, buf, bytes2fetch, MPI_CHAR, &status);
+    MPI_Get_count(&status, MPI_CHAR, &bytes_read);  // MPI_Get_Count can only return 32-bit integers
+    if(!bytes_read)
+    {
+        delete [] originalbuf;
+        return true;    // done
+    }
+    SpParHelper::check_newline(&bytes_read, bytes2fetch, buf);
+    if(firstcall)
+    {
+        if(buf[0] == '\n')  // we got super lucky and hit the line break
+        {
+            buf += 1;
+            bytes_read -= 1;
+            curpos += 1;
+        }
+        else    // skip to the next line and let the preceeding processor take care of this partial line
+        {
+            char *c = (char*)memchr(buf, '\n', MAXLINELENGTH); //  return a pointer to the matching byte or NULL if the character does not occur
+            if (c == NULL) {
+                cout << "Unexpected line without a break" << endl;
+            }
+            int n = c - buf + 1;
+            bytes_read -= n;
+            buf += n;
+            curpos += n;
+        }
+    }
+    while(bytes_read > 0 && curpos < end_fpos)  // this will also finish the last line
+    {
+        char *c = (char*)memchr(buf, '\n', bytes_read); //  return a pointer to the matching byte or NULL if the character does not occur
+        if (c == NULL) {
+            delete [] originalbuf;
+            return false;  // if bytes_read stops in the middle of a line, that line will be re-read next time since curpos has not been moved forward yet
+        }
+        int n = c - buf + 1;
+        
+        // string constructor from char * buffer: copies the first n characters from the array of characters pointed by s
+        lines.push_back(string(buf, n-1));  // no need to copy the newline character
+        bytes_read -= n;   // reduce remaining bytes
+        buf += n;   // move forward the buffer
+        curpos += n;
+    }
+    delete [] originalbuf;
+    if (curpos >= end_fpos) return true;  // don't call it again, nothing left to read
+    else    return false;
+}
+
 
 inline void SpParHelper::WaitNFree(vector<MPI_Win> & arrwin)
 {

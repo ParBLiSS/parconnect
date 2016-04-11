@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.3 -------------------------------------------------*/
-/* date: 2/1/2013 ----------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
- Copyright (c) 2010-, Aydin Buluc
+ Copyright (c) 2010-2015, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -41,9 +41,6 @@
 	#define _OPENMP
 	#endif
 	#include <omp.h>
-#endif
-#ifdef TAU_PROFILE
-	#include <Profile/Profiler.h>
 #endif
 
 #ifdef USE_PAPI
@@ -129,15 +126,11 @@ void CheckPAPI(int errorcode, char [] errorstring)
 	}
 }
 #endif
-					
+
+
 
 int main(int argc, char* argv[])
 {
-#ifdef TAU_PROFILE
-	TAU_PROFILE_TIMER(maintimer, "main()", "int (int, char **)", TAU_DEFAULT);
-    	TAU_PROFILE_INIT(argc, argv);
-    	TAU_PROFILE_START(maintimer);
-#endif
 	int nprocs, myrank;
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
@@ -171,12 +164,14 @@ int main(int argc, char* argv[])
 	{
 		typedef SpParMat < int64_t, TwitterEdge, SpDCCols<int64_t, TwitterEdge > > PSpMat_Twitter;
 		typedef SpParMat < int64_t, bool, SpDCCols<int64_t, bool > > PSpMat_Bool;
+		shared_ptr<CommGrid> fullWorld;
+		fullWorld.reset( new CommGrid(MPI_COMM_WORLD, 0, 0) );
 
 		// Declare objects
-		PSpMat_Twitter A;	
-		FullyDistVec<int64_t, int64_t> indegrees;	// in-degrees of vertices (including multi-edges and self-loops)
-		FullyDistVec<int64_t, int64_t> oudegrees;	// out-degrees of vertices (including multi-edges and self-loops)
-		FullyDistVec<int64_t, int64_t> degrees;	// combined degrees of vertices (including multi-edges and self-loops)
+		PSpMat_Twitter A(fullWorld);
+		FullyDistVec<int64_t, int64_t> indegrees(fullWorld);	// in-degrees of vertices (including multi-edges and self-loops)
+		FullyDistVec<int64_t, int64_t> oudegrees(fullWorld);	// out-degrees of vertices (including multi-edges and self-loops)
+		FullyDistVec<int64_t, int64_t> degrees(fullWorld);	// combined degrees of vertices (including multi-edges and self-loops)
 		PSpMat_Bool * ABool;
 
 		double t01 = MPI_Wtime();
@@ -250,9 +245,11 @@ int main(int argc, char* argv[])
 		ABool->Reduce(indegrees, Row, plus<int64_t>(), static_cast<int64_t>(0)); 	
 		
 		// indegrees_filt and oudegrees_filt is used for the real data
-		FullyDistVec<int64_t, int64_t> indegrees_filt;	
-		FullyDistVec<int64_t, int64_t> oudegrees_filt;	
-		FullyDistVec<int64_t, int64_t> degrees_filt[4];	// used for the synthetic data (symmetricized before randomization)
+		FullyDistVec<int64_t, int64_t> indegrees_filt(fullWorld);
+		FullyDistVec<int64_t, int64_t> oudegrees_filt(fullWorld);
+
+		typedef FullyDistVec<int64_t, int64_t> IntVec;	// used for the synthetic data (symmetricized before randomization)
+        	FullyDistVec<int64_t, int64_t> degrees_filt[4] = {IntVec(fullWorld), IntVec(fullWorld), IntVec(fullWorld), IntVec(fullWorld)};	
 		int64_t keep[PERCENTS] = {100, 1000, 2500, 10000}; 	// ratio of edges kept in range (0, 10000) 
 		
 		if(string(argv[1]) == string("File"))	// if using synthetic data, no notion of out/in degrees after randomization exist
@@ -336,7 +333,7 @@ int main(int argc, char* argv[])
 		MPI_Barrier(MPI_COMM_WORLD);
 		double t1 = MPI_Wtime();
 
-		FullyDistVec<int64_t, int64_t> Cands(MAX_ITERS);
+		FullyDistVec<int64_t, int64_t> Cands(MAX_ITERS, 0);
 		double nver = (double) degrees.TotalLength();
 		Cands.SelectCandidates(nver);
 
@@ -459,7 +456,10 @@ int main(int argc, char* argv[])
 				parentsp.Apply(myset<ParentType>(ParentType(1)));
 
 #ifndef ONLYTIME
-				FullyDistSpVec<int64_t, int64_t> intraversed, inprocessed, outraversed, ouprocessed;
+                		FullyDistSpVec<int64_t, int64_t> intraversed(fullWorld);
+                		FullyDistSpVec<int64_t, int64_t> inprocessed(fullWorld);
+               	 		FullyDistSpVec<int64_t, int64_t> outraversed(fullWorld);
+ 		               	FullyDistSpVec<int64_t, int64_t> ouprocessed(fullWorld);
 				inprocessed = EWiseApply<int64_t>(parentsp, indegrees, seldegree(), passifthere(), true, ParentType());
 				ouprocessed = EWiseApply<int64_t>(parentsp, oudegrees, seldegree(), passifthere(), true, ParentType());
 				int64_t nedges, in_nedges, ou_nedges;
@@ -617,9 +617,6 @@ int main(int argc, char* argv[])
 			SpParHelper::Print(os.str());
 		}
 	}
-#ifdef TAU_PROFILE
-    	TAU_PROFILE_STOP(maintimer);
-#endif
 	MPI_Finalize();
 	return 0;
 }

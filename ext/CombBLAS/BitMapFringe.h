@@ -1,12 +1,12 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.3 -------------------------------------------------*/
-/* date: 05/01/2012 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /* this file contributed by Scott Beamer of UC Berkeley --------*/
 /****************************************************************/
 /*
- Copyright (c) 2012, Scott Beamer
+ Copyright (c) 2010-2014, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -140,10 +140,12 @@ class BitMapFringe {
 				 trans_bm->data(), trans_words_recv, MPIType<uint64_t>(), diagneigh, TROST, World, &status); 
 	  
     // Gather all but first words
-    double t1 = MPI_Wtime();
-	MPI_Allgatherv(trans_bm->data()+1, send_counts[colrank], MPIType<uint64_t>(), gather_bm->data(), send_counts, word_dpls, MPIType<uint64_t>(), ColWorld);	
-    double t2 = MPI_Wtime();
 #ifdef BOTTOMUPTIME
+    double t1 = MPI_Wtime();
+#endif
+	MPI_Allgatherv(trans_bm->data()+1, send_counts[colrank], MPIType<uint64_t>(), gather_bm->data(), send_counts, word_dpls, MPIType<uint64_t>(), ColWorld);	
+#ifdef BOTTOMUPTIME
+    double t2 = MPI_Wtime();
     bottomup_allgather += (t2-t1);
 #endif
 
@@ -166,7 +168,7 @@ class BitMapFringe {
     IT bm_index=local_subword_disp, up_index=0;
 	  
     if (local_bm->get_bit(bm_index))	// if the first valid bit is 1
-      updates[up_index++] = bm_index - local_subword_disp;	// ABAB: local_subword_disp is subtracted
+      updates[up_index++] = bm_index - local_subword_disp;	// ABAB: local_subword_disp is NOT subtracted (as local_subword_disp is equal to bm_index)
 	  
     bm_index = local_bm->get_next_bit(bm_index);
     while(bm_index != -1) {

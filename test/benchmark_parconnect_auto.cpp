@@ -245,6 +245,8 @@ int main(int argc, char** argv)
     timer.end_section("BFS iterations executed");
 #endif
 
+    LOG_IF(!comm.rank(), INFO) << "Number of vertices visited by 1st BFS iteration -> " << componentCountsResult[0];
+
     //Get the remaining edgeList
     bfsInstance.filterEdgeList();
 

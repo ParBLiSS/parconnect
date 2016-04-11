@@ -1,9 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.1 -------------------------------------------------*/
-/* date: 12/25/2010 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
+/*
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #ifndef _SP_TUPLES_H
 #define _SP_TUPLES_H
@@ -39,7 +60,7 @@ class SpTuples: public SpMat<IT, NT, SpTuples<IT,NT> >
 public:
 	// Constructors 
 	SpTuples (int64_t size, IT nRow, IT nCol);
-	SpTuples (int64_t size, IT nRow, IT nCol, tuple<IT, IT, NT> * mytuples);
+	SpTuples (int64_t size, IT nRow, IT nCol, tuple<IT, IT, NT> * mytuples, bool sorted = false);
 	SpTuples (int64_t maxnnz, IT nRow, IT nCol, vector<IT> & edges, bool removeloops = true);	// Graph500 contructor
 	SpTuples (int64_t size, IT nRow, IT nCol, StackEntry<NT, pair<IT,IT> > * & multstack);		
 	SpTuples (const SpTuples<IT,NT> & rhs);	 	// Actual Copy constructor
@@ -137,8 +158,13 @@ public:
 	template<typename SR, typename IU, typename NU>
 	friend SpTuples<IU,NU> * MergeAllRec(const vector<SpTuples<IU,NU> *> & ArrSpTups, IU mstar, IU nstar); 
 	
-	ofstream& putstream (ofstream& outfile) const;		
-	ifstream& getstream (ifstream& infile); 
+	ofstream& putstream (ofstream& outfile) const;
+    ofstream& put (ofstream& outfile) const
+    { return putstream(outfile); }
+
+	ifstream& getstream (ifstream& infile);
+    ifstream& get (ifstream& infile) { return getstream(infile); }
+
 
 	bool isZero() const { return (nnz == 0); }	
 	IT getnrow() const { return m; }
@@ -146,15 +172,9 @@ public:
 	int64_t getnnz() const { return nnz; }
 
 	void PrintInfo();
+    tuple<IT, IT, NT> * tuples; 	
 
 private:
-	tuple<IT, IT, NT> * tuples; 	// boost:tuple
-	/** 
-	 **	tuple elements with indices:
-	 **	0) IT * ir ;	    	//  array of row indices, size nnz 
-	 **	1) IT * jc ;	    	//  array of col indices, size nnz 
-	 **	2) NT * numx;		//  array of generic values, size nnz
-	 **/
 
 	IT m;
 	IT n;

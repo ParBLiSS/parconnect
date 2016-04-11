@@ -1,32 +1,34 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
+ Copyright (c) 2010-2015, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
-#include "CombBLAS.h"
+#include <memory>
+#include "CommGrid.h"
+#include "SpDefs.h"
 
 CommGrid::CommGrid(MPI_Comm world, int nrowproc, int ncolproc): grrows(nrowproc), grcols(ncolproc)
 {
@@ -157,16 +159,21 @@ void CommGrid::OpenDebugFile(string prefix, ofstream & output) const
 
 shared_ptr<CommGrid> ProductGrid(CommGrid * gridA, CommGrid * gridB, int & innerdim, int & Aoffset, int & Boffset)
 {
-	if(gridA->grcols != gridB->grrows)
-	{
-		cout << "Grids don't confirm for multiplication" << endl;
-		MPI_Abort(MPI_COMM_WORLD,GRIDMISMATCH);
-	}
+    if(*gridA != *gridB)
+    {
+        cout << "Grids don't confirm for multiplication" << endl;
+        MPI_Abort(MPI_COMM_WORLD,GRIDMISMATCH);
+    }
+    // AA: these parameters are kept for backward compatibility
+    // they should not be used
 	innerdim = gridA->grcols;
 	Aoffset = (gridA->myprocrow + gridA->myproccol) % gridA->grcols;	// get sequences that avoids contention
 	Boffset = (gridB->myprocrow + gridB->myproccol) % gridB->grrows;
 		
-	MPI_Comm world = MPI_COMM_WORLD;
-	return shared_ptr<CommGrid>( new CommGrid(world, gridA->grrows, gridB->grcols) );
+	//MPI_Comm world = MPI_COMM_WORLD;
+	//return shared_ptr<CommGrid>( new CommGrid(world, gridA->grrows, gridB->grcols) );
+    return shared_ptr<CommGrid>( new CommGrid(*gridA) );
 }
+
+
 

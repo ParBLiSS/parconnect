@@ -1,3 +1,31 @@
+/****************************************************************/
+/* Parallel Combinatorial BLAS Library (for Graph Computations) */
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
+/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/****************************************************************/
+/*
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
+
 #ifndef _BFS_FRIENDS_H_
 #define _BFS_FRIENDS_H_
 
@@ -307,6 +335,7 @@ FullyDistSpVec<IT,VT>  SpMV (const SpParMat<IT,bool,UDER> & A, const FullyDistSp
 	IT lenuntil;
 	int32_t *trxinds, *indacc;
 	VT *trxnums, *numacc;
+    
 	
 #ifdef TIMING
 	double t0=MPI_Wtime();
@@ -341,14 +370,15 @@ FullyDistSpVec<IT,VT>  SpMV (const SpParMat<IT,bool,UDER> & A, const FullyDistSp
 #ifdef TIMING
 	double t2=MPI_Wtime();
 #endif
-  //Commeting this statement below to avoid possibility
-  //of a deadlock in the alltoallv
-
-	//if(optbuf.totmax > 0 )	// graph500 optimization enabled
+	if(optbuf.totmax > 0 )	// graph500 optimization enabled
 	{
-    MPI_Alltoallv(optbuf.inds, sendcnt, optbuf.dspls, MPIType<int32_t>(), recvindbuf, recvcnt, rdispls, MPIType<int32_t>(), RowWorld);  
+        MPI_Alltoallv(optbuf.inds, sendcnt, optbuf.dspls, MPIType<int32_t>(), recvindbuf, recvcnt, rdispls, MPIType<int32_t>(), RowWorld);  
 		MPI_Alltoallv(optbuf.nums, sendcnt, optbuf.dspls, MPIType<VT>(), recvnumbuf, recvcnt, rdispls, MPIType<VT>(), RowWorld);  
 		delete [] sendcnt;
+	}
+	else
+	{
+		SpParHelper::Print("BFS only (no semiring) function only work with optimization buffers\n");
 	}
 #ifdef TIMING
 	double t3=MPI_Wtime();
@@ -456,7 +486,9 @@ void BottomUpStep(SpParMat<IT,bool,UDER> & A, FullyDistSpVec<IT,VT> & x, BitMapF
 		IT sub_start = done.GetGlobalStartOfLocal();
 		int dest_slice = (mycol + sub_step) % numcols;
 		int source_slice = (mycol - sub_step + numcols) % numcols;
+#ifdef BOTTOMUPTIME
 		double t1 = MPI_Wtime();
+#endif
 #ifdef THREADED
 #pragma omp parallel
 		{

@@ -79,17 +79,18 @@ namespace conn
           //TODO: Generalize these types
           OptBuf<int32_t, int64_t> optbuf;
 
-          //Degrees of each vertex (useful while computing MTEPS score)
-          FullyDistVec<E, E> degrees;
-
           //Record MTEPS score of each iteration
           std::vector<double> MTEPS;
+
+          //This is the communicator which participates for computing the components
+          mxx::comm comm;
 
           //combBLAS distributed storage for adjacency matrix
           booleanMatrixType A;
 
-          //This is the communicator which participates for computing the components
-          mxx::comm comm;
+          //Degrees of each vertex (useful while computing MTEPS score)
+          //TODO : Construct this member using the communicator of this class
+          FullyDistVec<E, E> degrees;
 
           //For convenience, define the maximum value 
           E MAX = std::numeric_limits<E>::max();
@@ -107,8 +108,8 @@ namespace conn
          * @param[in] comm        mpi communicator
          *                        TODO : Enable the communicator restriction on all the BFS functions
          */
-        bfsSupport(std::vector< std::pair<E, E> > &edgeList, std::size_t vertexCount,
-                  const mxx::comm &comm) : edgeList(edgeList), comm(comm.copy())
+        bfsSupport(std::vector< std::pair<E, E> > &_edgeList, std::size_t vertexCount,
+                  const mxx::comm &_comm) : edgeList(_edgeList), comm(_comm.copy()), A(comm), degrees(comm)
         {
           //List of edges, distributed in 1D fashion
           DistEdgeList<E> *DEL = new DistEdgeList<E>();

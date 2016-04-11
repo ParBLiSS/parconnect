@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.3 -------------------------------------------------*/
-/* date: 2/1/2013 ----------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
-Copyright (c) 2010-, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2015, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 // These macros should be defined before stdint.h is included
 #ifndef __STDC_CONSTANT_MACROS
@@ -42,8 +42,6 @@ THE SOFTWARE.
 #include <ctime>
 #include <cmath>
 #include "../CombBLAS.h"
-#include "../SpParVec.h"	// ABAB: deprecated
-#include "../DenseParVec.h"	// ABAB: deprecated
 
 
 // Simple helper class for declarations: Just the numerical type is templated 
@@ -69,14 +67,14 @@ int main(int argc, char* argv[])
 	typedef PlusTimesSRing<bool, double> PTBOOLDOUBLE;
 
 	if(argc < 4)
-        {
+    {
 		if(myrank == 0)
 		{	
-                	cout << "Usage: ./betwcent <BASEADDRESS> <K4APPROX> <BATCHSIZE>" << endl;
-                	cout << "Example: ./betwcent Data/ 15 128" << endl;
-                	cout << "Input file input.txt should be under <BASEADDRESS> in triples format" << endl;
-                	cout << "<BATCHSIZE> should be a multiple of sqrt(p)" << endl;
-			cout << "Because <BATCHSIZE> is for the overall matrix (similarly, <K4APPROX> is global as well) " << endl;
+                cout << "Usage: ./betwcent <BASEADDRESS> <K4APPROX> <BATCHSIZE> <output file - optional>" << endl;
+                cout << "Example: ./betwcent Data/ 15 128" << endl;
+                cout << "Input file input.txt should be under <BASEADDRESS> in triples format" << endl;
+                cout << "<BATCHSIZE> should be a multiple of sqrt(p)" << endl;
+                cout << "Because <BATCHSIZE> is for the overall matrix (similarly, <K4APPROX> is global as well) " << endl;
  		}
 		MPI_Finalize();
 		return -1;
@@ -90,7 +88,11 @@ int main(int argc, char* argv[])
 		string ifilename = "input.txt";
 		ifilename = directory+"/"+ifilename;
 
-		Dist<bool>::MPI_DCCols A, AT;	// construct object
+		shared_ptr<CommGrid> fullWorld;
+		fullWorld.reset( new CommGrid(MPI_COMM_WORLD, 0, 0) );
+        
+		Dist<bool>::MPI_DCCols A(fullWorld);
+        	Dist<bool>::MPI_DCCols AT(fullWorld);	// construct object
 		AT.ReadDistribute(ifilename, 0);	// read it from file, note that we use the transpose of "input" data
 		A = AT;
 		A.Transpose();
@@ -109,10 +111,12 @@ int main(int argc, char* argv[])
 			cout << "*** Processing "<< nPasses <<" vertices instead"<< endl;
 		}
 
-		vector<int> candidates;
-		if (myrank == 0)
-			cout << "Batch processing will occur " << numBatches << " times, each processing " << nBatchSize << " vertices (overall)" << endl;
+        A.PrintInfo();
+        ostringstream tinfo;
+		tinfo << "Batch processing will occur " << numBatches << " times, each processing " << nBatchSize << " vertices (overall)" << endl;
+        SpParHelper::Print(tinfo.str());
 
+        vector<int> candidates;
 		// Only consider non-isolated vertices
 		int vertices = 0;
 		int vrtxid = 0; 
@@ -137,7 +141,7 @@ int main(int argc, char* argv[])
 		SpParHelper::Print("Candidates chosen, precomputation finished\n");
 		double t1 = MPI_Wtime();
 		vector<int> batch(subBatchSize);
-		DenseParVec<int, double> bc(AT.getcommgrid(),0.0);
+		FullyDistVec<int, double> bc(AT.getcommgrid(), A.getnrow(), 0.0);
 
 		for(int i=0; i< numBatches; ++i)
 		{
@@ -206,8 +210,8 @@ int main(int argc, char* argv[])
 				delete bfs[j];
 			}
 		
-			SpParHelper::Print("Adding bc contributions...\n");			
-			bc += bcu.Reduce(Row, plus<double>(), 0.0);	// pack along rows
+			SpParHelper::Print("Adding bc contributions...\n");
+			bc += FullyDistVec<int, double>(bcu.Reduce(Row, plus<double>(), 0.0));	// pack along rows
 		}
 		bc.Apply(bind2nd(minus<double>(), nPasses));	// Subtrack nPasses from all the bc scores (because bcu was initialized to all 1's)
 		
@@ -219,6 +223,9 @@ int main(int argc, char* argv[])
 			fprintf(stdout, "%.6lf seconds elapsed for %d starting vertices\n", t2-t1, nPasses);
 			fprintf(stdout, "TEPS score is: %.6lf\n", TEPS);
 		}
+        ofstream output(argv[4]);
+        bc.SaveGathered(output, 0);
+        output.close();
 	}	
 
 	// make sure the destructors for all objects are called before MPI::Finalize()

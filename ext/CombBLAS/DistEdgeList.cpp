@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #include <mpi.h>
 
@@ -48,6 +48,12 @@ template <typename IT>
 DistEdgeList<IT>::DistEdgeList(): edges(NULL), pedges(NULL), nedges(0), globalV(0)
 {
 	commGrid.reset(new CommGrid(MPI_COMM_WORLD, 0, 0));
+}
+
+template <typename IT>
+DistEdgeList<IT>::DistEdgeList(MPI_Comm & myWorld): edges(NULL), pedges(NULL), nedges(0), globalV(0)
+{
+    commGrid.reset(new CommGrid(myWorld, 0, 0));
 }
 
 template <typename IT>
@@ -225,7 +231,7 @@ void DistEdgeList<IT>::GenGraph500Data(double initiator[4], int log_numverts, in
 
 	if(packed)
 	{
-		RefGen21::make_graph (log_numverts, globaledges, &nedges, (packed_edge**)(&pedges));
+		RefGen21::make_graph (log_numverts, globaledges, &nedges, (packed_edge**)(&pedges), commGrid->GetWorld());
 	}
 	else
 	{
@@ -265,16 +271,12 @@ void DistEdgeList<IT>::GenGraph500Data(double initiator[4], int log_numverts, in
 		{
 			for(IT i=0; i < nedges; ++i)
 			{
-        //std::cout << "Rank " << rank  << "[" << edges[2*i + 0] << ", " << edges[2*i + 1] << "]" << std::endl;
 				edges[2*i+0] = RefGen21::scramble(edges[2*i+0], log_numverts, val0, val1);
 				edges[2*i+1] = RefGen21::scramble(edges[2*i+1], log_numverts, val0, val1);
 			}
 		}
 	}
 }
-
-
-
 
 
 /**

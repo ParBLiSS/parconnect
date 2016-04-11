@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.3 -------------------------------------------------*/
-/* date: 2/1/2013 ----------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
- Copyright (c) 2010-, Aydin Buluc
+ Copyright (c) 2010-2015, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -81,9 +81,13 @@ int main(int argc, char* argv[])
 
 		MPI_Barrier(MPI_COMM_WORLD);
 		typedef PlusTimesSRing<double, double> PTDD;	
+		shared_ptr<CommGrid> fullWorld;
+		fullWorld.reset( new CommGrid(MPI_COMM_WORLD, 0, 0) );
 
-		PSpMat<double>::MPI_DCCols A, L, T;	// construct objects
-		FullyDistVec<int,double> dvec;
+        	PSpMat<double>::MPI_DCCols A(fullWorld); // construct objects
+        	PSpMat<double>::MPI_DCCols L(fullWorld);
+        	PSpMat<double>::MPI_DCCols T(fullWorld);
+		FullyDistVec<int,double> dvec(fullWorld);
 		
 		// For matrices, passing the file names as opposed to fstream objects
 		A.ReadDistribute(Aname, 0);

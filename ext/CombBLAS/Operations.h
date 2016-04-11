@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
- Copyright (c) 2011, Aydin Buluc
+ Copyright (c) 2010-2014, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -36,9 +36,19 @@
 #include <iostream>
 #include <functional>
 #include <cmath>
-#include <mpi.h>
+#include <limits>
+#include "psort-1.0/driver/MersenneTwister.h"
 
 using namespace std;
+
+template<typename T1, typename T2>
+struct equal_first
+{
+    bool operator()(pair<T1,T2> & lhs, pair<T1,T2> & rhs){
+        return lhs.first == rhs.first;
+    }
+};
+
 
 
 template<typename T>
@@ -52,6 +62,7 @@ struct myset: public std::unary_function<T, T>
   } 
   T value;
 };
+
 
 template<typename T>
 struct identity : public std::unary_function<T, T>
@@ -97,6 +108,15 @@ struct safemultinv : public std::unary_function<T, T>
   }
 };
 
+
+template<typename T>
+struct sel2nd: public std::binary_function<T, T, T>
+{
+    const T& operator()(const T& x, const T & y) const
+    {
+        return y;
+    }
+};
 
 template<typename T1, typename T2>
 struct bintotality : public std::binary_function<T1, T2, bool>
@@ -156,6 +176,50 @@ struct minimum : public std::binary_function<T, T, T>
     return x < y? x : y;
   }
 };
+
+/**
+ *  @brief With 50/50 chances, return a one of the operants
+ */
+template<typename T>
+struct RandReduce : public std::binary_function<T, T, T>
+{
+    /** @returns the minimum of x and y. */
+    const T operator()(const T& x, const T& y) 
+    {
+        return (M.rand() < 0.5)? x : y;
+    }
+    RandReduce()
+    {
+    #ifdef DETERMINISTIC
+        M = MTRand(1);
+    #else
+        M = MTRand();	// generate random numbers with Mersenne Twister
+    #endif
+    }
+    MTRand M;
+};
+
+/**
+ *  @brief Returns a special value (passed to the constructor of the functor) when both operants disagree
+ */
+template<typename T>
+struct SetIfNotEqual : public std::binary_function<T, T, T>
+{
+    const T operator()(const T& x, const T& y)
+    {
+        if(x != y)
+        {
+            return valuetoset;
+        }
+        else
+        {
+            return x;
+        }
+    }
+    SetIfNotEqual(T value):valuetoset(value) { };
+    T valuetoset;
+};
+
 
 /**
  *  @brief Compute the bitwise AND of two integral values.
@@ -228,26 +292,6 @@ struct bitwise_xor : public std::binary_function<T, T, T>
 };
 
 
-// MPIOp: A class that has a static op() function that takes no arguments and returns the corresponding MPI_Op
-// if and only if the given Op has a mapping to a valid MPI_Op
-// No concepts checking for the applicability of Op on the datatype T at the moment
-// In the future, this can be implemented via metafunction forwarding using mpl::or_ and mpl::bool_
-
-template <typename Op, typename T> 
-struct MPIOp
-{
-};
-
-template<typename T> struct MPIOp< maximum<T>, T > {  static MPI_Op op() { return MPI_MAX; } };
-template<typename T> struct MPIOp< minimum<T>, T > {  static MPI_Op op() { return MPI_MIN; } };
-template<typename T> struct MPIOp< std::plus<T>, T > {  static MPI_Op op() { return MPI_SUM; } };
-template<typename T> struct MPIOp< std::multiplies<T>, T > {  static MPI_Op op() { return MPI_PROD; } };
-template<typename T> struct MPIOp< std::logical_and<T>, T > {  static MPI_Op op() { return MPI_LAND; } };
-template<typename T> struct MPIOp< std::logical_or<T>, T > {  static MPI_Op op() { return MPI_LOR; } };
-template<typename T> struct MPIOp< logical_xor<T>, T > {  static MPI_Op op() { return MPI_LXOR; } };
-template<typename T> struct MPIOp< bitwise_and<T>, T > {  static MPI_Op op() { return MPI_BAND; } };
-template<typename T> struct MPIOp< bitwise_or<T>, T > {  static MPI_Op op() { return MPI_BOR; } };
-template<typename T> struct MPIOp< bitwise_xor<T>, T > {  static MPI_Op op() { return MPI_BXOR; } };
 
 
 #endif

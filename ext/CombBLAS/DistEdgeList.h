@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #ifndef _DIST_EDGE_LIST_H_
 #define _DIST_EDGE_LIST_H_
@@ -50,6 +50,7 @@ THE SOFTWARE.
 #include "FullyDistVec.h"
 #include "Friends.h"
 #include "Operations.h"
+
 
 
 /** 
@@ -82,6 +83,7 @@ class DistEdgeList
 public:	
 	// Constructors
 	DistEdgeList ();
+    DistEdgeList(MPI_Comm & myWorld);
 	DistEdgeList (const char * filename, IT globaln, IT globalm);	// read from binary in parallel
 	~DistEdgeList ();
 
@@ -95,7 +97,7 @@ public:
    * @param[in] edgelist    vector of edges
    */
   template <typename EdgeListType>  //Vector of tuples
-    void GenGraphData(const EdgeListType &edgeList, int numverts)
+    void GenGraphData(const EdgeListType &edgeList, int64_t numverts)
     {
       //Set count of vertices
       globalV = numverts;
@@ -119,13 +121,17 @@ public:
       }
     }
 
+
+
 	void CleanupEmpties();
 	
 	int64_t getGlobalV() const { return globalV; }
 	IT getNumLocalEdges() const { return nedges; }
+    IT* getEdges() const {return edges;}
+    packed_edge * getPackedEdges() const { return pedges; }
+    shared_ptr<CommGrid> commGrid;
 	
 private:
-	shared_ptr<CommGrid> commGrid; 
 	
 	IT* edges; // edge list composed of pairs of edge endpoints.
 	           // Edge i goes from edges[2*i+0] to edges[2*i+1]
@@ -149,6 +155,7 @@ private:
 
 template<typename IU>
 void PermEdges(DistEdgeList<IU> & DEL);
+
 
 #include "DistEdgeList.cpp"
 

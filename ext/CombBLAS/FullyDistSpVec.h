@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #ifndef _FULLY_DIST_SP_VEC_H_
 #define _FULLY_DIST_SP_VEC_H_
@@ -72,17 +72,54 @@ class FullyDistSpVec: public FullyDist<IT,NT,typename CombBLAS::disable_if< Comb
 {
 public:
 	FullyDistSpVec ( );
-	FullyDistSpVec ( IT glen );
+	explicit FullyDistSpVec ( IT glen );
 	FullyDistSpVec ( shared_ptr<CommGrid> grid);
 	FullyDistSpVec ( shared_ptr<CommGrid> grid, IT glen);
 
+    template <typename _UnaryOperation>
+    FullyDistSpVec (const FullyDistVec<IT,NT> & rhs, _UnaryOperation unop);
 	FullyDistSpVec (const FullyDistVec<IT,NT> & rhs);					// Conversion copy-constructor
+    FullyDistSpVec (IT globalsize, const FullyDistVec<IT,IT> & inds,  const FullyDistVec<IT,NT> & vals, bool SumDuplicates = false);
+
+    FullyDistSpVec<IT,NT> Invert (IT globallen);
+    template <typename _BinaryOperationIdx, typename _BinaryOperationVal>
+    FullyDistSpVec<IT,NT> Invert (IT globallen, _BinaryOperationIdx __binopIdx, _BinaryOperationVal __binopVal);
+    template <typename _BinaryOperationIdx, typename _BinaryOperationVal>
+    FullyDistSpVec<IT,NT> InvertRMA (IT globallen, _BinaryOperationIdx __binopIdx, _BinaryOperationVal __binopVal);
+
+    
+    template <typename NT1, typename _UnaryOperation>
+    void Select (const FullyDistVec<IT,NT1> & denseVec, _UnaryOperation unop);
+    template <typename NT1, typename _UnaryOperation1, typename _UnaryOperation2>
+    FullyDistSpVec<IT,NT1> SelectNew (const FullyDistVec<IT,NT1> & denseVec, _UnaryOperation1 __unop1, _UnaryOperation2 __unop2);
+    template <typename _UnaryOperation>
+    void FilterByVal (FullyDistSpVec<IT,IT> Selector, _UnaryOperation __unop, bool filterByIndex);
+    template <typename NT1>
+    void Setminus (const FullyDistSpVec<IT,NT1> & other);
+
+    //template <typename NT1, typename _UnaryOperation>
+    //void Set (FullyDistSpVec<IT,NT1> Selector, _UnaryOperation __unop);
+
+    template <typename NT1, typename _UnaryOperation, typename _BinaryOperation>
+    void SelectApply (const FullyDistVec<IT,NT1> & denseVec, _UnaryOperation __unop, _BinaryOperation __binop);
+    template <typename NT1, typename _UnaryOperation, typename _BinaryOperation>
+    FullyDistSpVec<IT,NT> SelectApplyNew (const FullyDistVec<IT,NT1> & denseVec, _UnaryOperation __unop, _BinaryOperation __binop);
+
 
 	//! like operator=, but instead of making a deep copy it just steals the contents. 
 	//! Useful for places where the "victim" will be distroyed immediately after the call.
 	void stealFrom(FullyDistSpVec<IT,NT> & victim); 
 	FullyDistSpVec<IT,NT> &  operator=(const FullyDistSpVec< IT,NT > & rhs);
 	FullyDistSpVec<IT,NT> &  operator=(const FullyDistVec< IT,NT > & rhs);	// convert from dense
+    FullyDistSpVec<IT,NT> &  operator=(NT fixedval) // assign fixed value
+    {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for(IT i=0; i < ind.size(); ++i)
+            num[i] = fixedval;
+        return *this;
+    }
 	FullyDistSpVec<IT,NT> & operator+=(const FullyDistSpVec<IT,NT> & rhs);
 	FullyDistSpVec<IT,NT> & operator-=(const FullyDistSpVec<IT,NT> & rhs);
 
@@ -106,6 +143,13 @@ public:
 		}
 	};
 	
+    //! New (2014) version that can handle parallel IO and binary files
+    template <class HANDLER>
+    void ReadDistribute (const string & filename, int master, HANDLER handler, bool pario);
+    void ReadDistribute (const string & filename, int master, bool pario) { ReadDistribute(filename, master, ScalarReadSaveHandler(), pario); }
+
+
+    //! Obsolete version that only accepts an ifstream object and ascii files
 	template <class HANDLER>
 	ifstream& ReadDistribute (ifstream& infile, int master, HANDLER handler);	
 	ifstream& ReadDistribute (ifstream& infile, int master) { return ReadDistribute(infile, master, ScalarReadSaveHandler()); }
@@ -149,12 +193,22 @@ public:
       }
     }
 
+
+
 	NT operator[](IT indx);
 	bool WasFound() const { return wasFound; }
 
-	// sort the vector itself
-	// return the permutation vector (0-based)
+	//! sort the vector itself, return the permutation vector (0-based)
 	FullyDistSpVec<IT, IT> sort();	
+
+#if __cplusplus > 199711L
+	template <typename _BinaryOperation = minimum<NT> >
+	FullyDistSpVec<IT, NT> Uniq(_BinaryOperation __binary_op = _BinaryOperation(), MPI_Op mympiop = MPI_MIN);
+#else
+	template <typename _BinaryOperation >
+	FullyDistSpVec<IT, NT> Uniq(_BinaryOperation __binary_op, MPI_Op mympiop);
+#endif
+
 
 	IT getlocnnz() const 
 	{
@@ -191,7 +245,13 @@ public:
 	template <typename _UnaryOperation>
 	void Apply(_UnaryOperation __unary_op)
 	{
-		transform(num.begin(), num.end(), num.begin(), __unary_op);
+		//transform(num.begin(), num.end(), num.begin(), __unary_op);
+        IT spsize = num.size();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for(IT i=0; i < spsize; ++i)
+            num[i] = __unary_op(num[i]);
 	}
 
 	template <typename _BinaryOperation>
@@ -206,11 +266,13 @@ public:
 			num[i] = __binary_op(num[i], ind[i] + offset);
 	}
 
+    
+
 	template <typename _BinaryOperation>
-	NT Reduce(_BinaryOperation __binary_op, NT init);
+	NT Reduce(_BinaryOperation __binary_op, NT init) const;
 	
 	template <typename OUT, typename _BinaryOperation, typename _UnaryOperation>
-	OUT Reduce(_BinaryOperation __binary_op, OUT default_val, _UnaryOperation __unary_op);
+	OUT Reduce(_BinaryOperation __binary_op, OUT default_val, _UnaryOperation __unary_op) const;
 
 	void DebugPrint();
 	shared_ptr<CommGrid> getcommgrid() const { return commGrid; }
@@ -218,16 +280,53 @@ public:
 	void Reset();
 	NT GetLocalElement(IT indx);
 	void BulkSet(IT inds[], int count);
+    vector<IT> GetLocalInd (){vector<IT> rind = ind; return rind;};
+    vector<NT> GetLocalNum (){vector<NT> rnum = num; return rnum;};
+    
+    template <typename _Predicate>
+    FullyDistVec<IT,IT> FindInds(_Predicate pred) const;
+    template <typename _Predicate>
+    FullyDistVec<IT,NT> FindVals(_Predicate pred) const;
+
 
 protected:
 	using FullyDist<IT,NT,typename CombBLAS::disable_if< CombBLAS::is_boolean<NT>::value, NT >::type>::glen; 
-	using FullyDist<IT,NT,typename CombBLAS::disable_if< CombBLAS::is_boolean<NT>::value, NT >::type>::commGrid; 
-
+	using FullyDist<IT,NT,typename CombBLAS::disable_if< CombBLAS::is_boolean<NT>::value, NT >::type>::commGrid;
+    
 private:
 	vector< IT > ind;	// ind.size() give the number of nonzeros
 	vector< NT > num;
-	bool wasFound; // true if the last GetElement operation returned an actual value.
+	bool wasFound; // true if the last GetElement operation returned an actual value
+    
+#if __cplusplus > 199711L
+	template <typename _BinaryOperation = minimum<NT> >
+	FullyDistSpVec<IT, NT> UniqAll2All(_BinaryOperation __binary_op = _BinaryOperation(), MPI_Op mympiop = MPI_MIN);
+    
+    template <typename _BinaryOperation = minimum<NT> >
+	FullyDistSpVec<IT, NT> Uniq2D(_BinaryOperation __binary_op = _BinaryOperation(), MPI_Op mympiop = MPI_MIN);
+#else
+	template <typename _BinaryOperation >
+	FullyDistSpVec<IT, NT> UniqAll2All(_BinaryOperation __binary_op, MPI_Op mympiop);
+    
+    template <typename _BinaryOperation >
+	FullyDistSpVec<IT, NT> Uniq2D(_BinaryOperation __binary_op, MPI_Op mympiop);
+#endif
+    
 
+    template <class HANDLER>
+    void ReadAllMine(FILE * binfile, IT * & inds, NT * & vals, vector< pair<IT,NT> > & localpairs, int * rcurptrs, int * ccurptrs, int * rdispls, int * cdispls,
+                     IT buffperrowneigh, IT buffpercolneigh, IT entriestoread, HANDLER handler, int rankinrow);
+    
+    void HorizontalSend(IT * & inds, NT * & vals, IT * & tempinds, NT * & tempvals, vector < pair <IT,NT> > & localpairs,
+                        int * rcurptrs, int * rdispls, IT buffperrowneigh, int recvcount, int rankinrow);
+    
+    void VerticalSend(IT * & inds, NT * & vals, vector< pair<IT,NT> > & localpairs, int * rcurptrs, int * ccurptrs, int * rdispls, int * cdispls,
+                      IT buffperrowneigh, IT buffpercolneigh, int rankinrow);
+    
+    void BcastEssentials(MPI_Comm & world, IT & total_m, IT & total_n, IT & total_nnz, int master);
+    
+    void AllocateSetBuffers(IT * & myinds, NT * & myvals,  int * & rcurptrs, int * & ccurptrs, int rowneighs, int colneighs, IT buffpercolneigh);
+    
 	template <class IU, class NU>
 	friend class FullyDistSpVec;
 
@@ -262,6 +361,11 @@ private:
 	friend FullyDistSpVec<IU,RET> 
 	EWiseApply (const FullyDistSpVec<IU,NU1> & V, const FullyDistVec<IU,NU2> & W , _BinaryOperation _binary_op, _BinaryPredicate _doOp, bool allowVNulls, NU1 Vzero, const bool useExtendedBinOp);
 
+    template <typename RET, typename IU, typename NU1, typename NU2, typename _BinaryOperation, typename _BinaryPredicate>
+    friend FullyDistSpVec<IU,RET>
+    EWiseApply_threaded (const FullyDistSpVec<IU,NU1> & V, const FullyDistVec<IU,NU2> & W , _BinaryOperation _binary_op, _BinaryPredicate _doOp, bool allowVNulls, NU1 Vzero, const bool useExtendedBinOp);
+
+    
 	template <typename RET, typename IU, typename NU1, typename NU2, typename _BinaryOperation, typename _BinaryPredicate>
 	friend FullyDistSpVec<IU,RET>
 	EWiseApply (const FullyDistSpVec<IU,NU1> & V, const FullyDistSpVec<IU,NU2> & W , _BinaryOperation _binary_op, _BinaryPredicate _doOp, bool allowVNulls, bool allowWNulls, NU1 Vzero, NU2 Wzero, const bool allowIntersect, const bool useExtendedBinOp);
@@ -281,6 +385,9 @@ private:
 	
 	template<typename IU, typename NV>
 	friend void TransposeVector(MPI_Comm & World, const FullyDistSpVec<IU,NV> & x, int32_t & trxlocnz, IU & lenuntil, int32_t * & trxinds, NV * & trxnums, bool indexisvalue);
+    
+    template <class IU, class NU, class DER, typename _UnaryOperation>
+    friend SpParMat<IU, bool, DER> PermMat1 (const FullyDistSpVec<IU,NU> & ri, const IU ncol, _UnaryOperation __unop);
 };
 
 #include "FullyDistSpVec.cpp"

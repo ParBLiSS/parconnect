@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2015, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #ifndef _DCSC_H
 #define _DCSC_H
@@ -45,6 +45,8 @@ template <class IT, class NT>
 class Dcsc
 {
 public:
+    typedef NT value_type;
+    typedef IT index_type;
 	Dcsc ();
 	Dcsc (IT nnz, IT nzcol);
 
@@ -72,13 +74,17 @@ public:
 		transform(numx, numx+nz, numx, __unary_op);
 	}
 
+	template <typename _UnaryOperation, typename GlobalIT>
+	Dcsc<IT,NT>* PruneI(_UnaryOperation __unary_op, bool inPlace, GlobalIT rowOffset, GlobalIT colOffset);
 	template <typename _UnaryOperation>
 	Dcsc<IT,NT>* Prune(_UnaryOperation __unary_op, bool inPlace);
 
 	IT AuxIndex(const IT colind, bool & found, IT * aux, IT csize) const;
 	
 	void RowSplit(int numsplits);
-	void Split(Dcsc<IT,NT> * & A, Dcsc<IT,NT> * & B, IT cut); 	
+    void ColSplit(vector< Dcsc<IT,NT>* > & parts, vector<IT> & cuts);
+
+	void Split(Dcsc<IT,NT> * & A, Dcsc<IT,NT> * & B, IT cut); 	//! \todo{special case of ColSplit, to be deprecated...}
 	void Merge(const Dcsc<IT,NT> * Adcsc, const Dcsc<IT,NT> * B, IT cut);		
 
 	IT ConstructAux(IT ndim, IT * & aux) const;
@@ -91,6 +97,10 @@ public:
 
 	template <typename _BinaryOperation>
 	void UpdateDense(NT ** array, _BinaryOperation __binary_op) const;	// update dense 2D array's entries with __binary_op using elements of "this"
+    
+    //! wrap object around pre-allocated arrays (possibly RDMA registered)
+    Dcsc (IT * _cp, IT * _jc, IT * _ir, NT * _numx, IT _nz, IT _nzc, bool _memowned = true)
+    : cp(_cp), jc(_jc), ir(_ir), numx(_numx), nz(_nz), nzc(_nzc), memowned(_memowned) {};
 
 	IT * cp;		//!<  The master array, size nzc+1 (keeps column pointers)
 	IT * jc ;		//!<  col indices, size nzc
@@ -99,6 +109,7 @@ public:
 	
 	IT nz;
 	IT nzc;			//!<  number of columns with at least one non-zero in them
+    bool memowned;
 
 private:
 	void getindices (StackEntry<NT, pair<IT,IT> > * multstack, IT & rindex, IT & cindex, IT & j, IT nnz);

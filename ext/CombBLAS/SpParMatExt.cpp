@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
 /*
- Copyright (c) 2011, Aydin Buluc
+ Copyright (c) 2010-2014, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -35,73 +35,6 @@
 #include <algorithm>
 #include <stdexcept>
 using namespace std;
-
-//! This file is a placeholder for some obsolete 
-//! or lesser used functions that take diagonally distributed vectors as inputs
-
-
-template <class IT, class NT, class DER>
-void SpParMat<IT,NT,DER>::DimScale(const DenseParVec<IT,NT> & v, Dim dim)
-{
-	switch(dim)
-	{
-		case Column:	// scale each "Column", using a row vector
-		{
-			// Diagonal processor broadcast data so that everyone gets the scaling vector 
-			NT * scaler = NULL;
-			int root = commGrid->GetDiagOfProcCol();
-			if(v.diagonal)
-			{	
-				scaler = const_cast<NT*>(SpHelper::p2a(v.arr));	
-			}
-			else
-			{	
-				scaler = new NT[getlocalcols()];	
-			}
-			MPI_Bcast(scaler, getlocalcols(), MPIType<NT>(), root, commGrid->GetColWorld());	
-
-			for(typename DER::SpColIter colit = spSeq->begcol(); colit != spSeq->endcol(); ++colit)	// iterate over columns
-			{
-				for(typename DER::SpColIter::NzIter nzit = spSeq->begnz(colit); nzit != spSeq->endnz(colit); ++nzit)
-				{
-					nzit.value() *=  scaler[colit.colid()];
-				}
-			}
-			if(!v.diagonal)	delete [] scaler;
-			break;
-		}
-		case Row:
-		{
-			NT * scaler = NULL;
-			int root = commGrid->GetDiagOfProcRow();
-			if(v.diagonal)
-			{	
-				scaler = const_cast<NT*>(SpHelper::p2a(v.arr));	
-			}
-			else
-			{	
-				scaler = new NT[getlocalrows()];	
-			}
-			MPI_Bcast(scaler, getlocalrows(), MPIType<NT>(), root, commGrid->GetRowWorld());	
-
-			for(typename DER::SpColIter colit = spSeq->begcol(); colit != spSeq->endcol(); ++colit)
-			{
-				for(typename DER::SpColIter::NzIter nzit = spSeq->begnz(colit); nzit != spSeq->endnz(colit); ++nzit)
-				{
-					nzit.value() *= scaler[nzit.rowid()];
-				}
-			}
-			if(!v.diagonal)	delete [] scaler;			
-			break;
-		}
-		default:
-		{
-			cout << "Unknown scaling dimension, returning..." << endl;
-			break;
-		}
-	}
-}
-
 
 /** 
  * Generalized sparse matrix indexing (ri/ci are 0-based indexed)

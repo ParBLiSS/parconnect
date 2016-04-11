@@ -1,30 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
-Copyright (c) 2011, Aydin Buluc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
+ Copyright (c) 2010-2015, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 #include "dcsc.h"
 #include <algorithm>
@@ -35,10 +35,10 @@ THE SOFTWARE.
 using namespace std;
 
 template <class IT, class NT>
-Dcsc<IT,NT>::Dcsc ():cp(NULL), jc(NULL), ir(NULL), numx(NULL),nz(0), nzc(0){}
+Dcsc<IT,NT>::Dcsc ():cp(NULL), jc(NULL), ir(NULL), numx(NULL),nz(0), nzc(0), memowned(true){}
 
 template <class IT, class NT>
-Dcsc<IT,NT>::Dcsc (IT nnz, IT nzcol): nz(nnz),nzc(nzcol)
+Dcsc<IT,NT>::Dcsc (IT nnz, IT nzcol): nz(nnz),nzc(nzcol),memowned(true)
 {
 	assert (nz != 0);
 	assert (nzc != 0);
@@ -190,7 +190,7 @@ Dcsc<IT,NT> & Dcsc<IT,NT>::AddAndAssign (StackEntry<NT, pair<IT,IT> > * multstac
   * \remark Complexity: O(nnz)
   */
 template <class IT, class NT>
-Dcsc<IT,NT>::Dcsc (StackEntry<NT, pair<IT,IT> > * multstack, IT mdim, IT ndim, IT nnz): nz(nnz)
+Dcsc<IT,NT>::Dcsc (StackEntry<NT, pair<IT,IT> > * multstack, IT mdim, IT ndim, IT nnz): nz(nnz),memowned(true)
 {
 	nzc = std::min(ndim, nnz);	// nzc can't exceed any of those
 
@@ -233,7 +233,7 @@ Dcsc<IT,NT>::Dcsc (StackEntry<NT, pair<IT,IT> > * multstack, IT mdim, IT ndim, I
   * \remark For these temporary matrices nz = nzc (which are both equal to nnz)
   */
 template <class IT, class NT>
-Dcsc<IT,NT>::Dcsc (IT nnz, const vector<IT> & indices, bool isRow): nz(nnz),nzc(nnz)
+Dcsc<IT,NT>::Dcsc (IT nnz, const vector<IT> & indices, bool isRow): nz(nnz),nzc(nnz),memowned(true)
 {
 	assert((nnz != 0) && (indices.size() == nnz));
 	cp = new IT[nnz+1];	
@@ -291,7 +291,7 @@ Dcsc<IT,NT>::operator Dcsc<NIT,NNT>() const
 }
 
 template <class IT, class NT>
-Dcsc<IT,NT>::Dcsc (const Dcsc<IT,NT> & rhs): nz(rhs.nz), nzc(rhs.nzc)
+Dcsc<IT,NT>::Dcsc (const Dcsc<IT,NT> & rhs): nz(rhs.nz), nzc(rhs.nzc),memowned(true)
 {
 	if(nz > 0)
 	{
@@ -423,7 +423,7 @@ Dcsc<IT, NT> & Dcsc<IT,NT>::operator+=(const Dcsc<IT,NT> & rhs)	// add and assig
 				else
 				{
 					temp.ir[curnz] = ir[ii];
-					temp.numx[curnz++] = numx[ii++] + rhs.numx[jj++];	// might include zeros
+                    temp.numx[curnz++] = numx[ii++] + rhs.numx[jj++];       // might include zeros
 				}
 			}
 			while (ii < cp[i+1])
@@ -515,6 +515,87 @@ void Dcsc<IT,NT>::EWiseMult(const Dcsc<IT,NT> & rhs, bool exclude)
 	*this = ::EWiseMult((*this), &rhs, exclude);	// call the binary version
 }
 
+
+template <class IT, class NT>
+template <typename _UnaryOperation, typename GlobalIT>
+Dcsc<IT,NT>* Dcsc<IT,NT>::PruneI(_UnaryOperation __unary_op, bool inPlace, GlobalIT rowOffset, GlobalIT colOffset)
+{
+	// Two-pass algorithm
+	IT prunednnz = 0;
+	IT prunednzc = 0;
+	for(IT i=0; i<nzc; ++i)
+	{
+		bool colexists = false;
+		for(IT j=cp[i]; j < cp[i+1]; ++j)
+		{
+			if(!(__unary_op(make_tuple(rowOffset+ir[j], colOffset+jc[i], numx[j])))) 	// keep this nonzero
+			{
+				++prunednnz;
+				colexists = true;
+			}
+		}
+		if(colexists) 	++prunednzc;
+	}
+	IT * oldcp = cp; 
+	IT * oldjc = jc;
+	IT * oldir = ir;	
+	NT * oldnumx = numx;	
+
+	cp = new IT[prunednzc+1];
+	jc = new IT[prunednzc];
+	ir = new IT[prunednnz];
+	numx = new NT[prunednnz];
+
+	IT cnzc = 0;
+	IT cnnz = 0;
+	cp[cnzc] = 0;
+	for(IT i=0; i<nzc; ++i)
+	{
+		for(IT j = oldcp[i]; j < oldcp[i+1]; ++j)
+		{
+			if(!(__unary_op(make_tuple(rowOffset+oldir[j], colOffset+oldjc[i], oldnumx[j])))) // keep this nonzero
+			{
+				ir[cnnz] = oldir[j];	
+				numx[cnnz++] = 	oldnumx[j];
+			}
+		}
+		if(cnnz > cp[cnzc])
+		{
+			jc[cnzc] = oldjc[i];
+			cp[cnzc+1] = cnnz;
+			++cnzc;
+		}
+	}
+	assert(cnzc == prunednzc);
+	assert(cnnz == prunednnz);
+	if (inPlace)
+	{
+		// delete the memory pointed by previous pointers
+		DeleteAll(oldnumx, oldir, oldjc, oldcp);
+		nz = cnnz;
+		nzc = cnzc;
+		return NULL;
+	}
+	else
+	{
+		// create a new object to store the data
+		Dcsc<IT,NT>* ret = new Dcsc<IT,NT>();
+		ret->cp = cp; 
+		ret->jc = jc;
+		ret->ir = ir;	
+		ret->numx = numx;
+		ret->nz = cnnz;
+		ret->nzc = cnzc;
+
+		// put the previous pointers back		
+		cp = oldcp;
+		jc = oldjc;
+		ir = oldir;
+		numx = oldnumx;
+		
+		return ret;
+	}
+}
 
 template <class IT, class NT>
 template <typename _UnaryOperation>
@@ -786,6 +867,74 @@ void Dcsc<IT,NT>::Split(Dcsc<IT,NT> * & A, Dcsc<IT,NT> * & B, IT cut)
 		std::copy(numx+cp[pos], numx+nz, B->numx);	// copy(first, last, result)
 	}
 }
+
+/**
+ ** Split along the cut(s) in terms of column indices
+ ** Should work even when one of the splits have no nonzeros at all
+ ** vector<IT> cuts is of length "size(parts)-1"
+ ** \pre{ size(parts) >= 2}
+ **/
+template<class IT, class NT>
+void Dcsc<IT,NT>::ColSplit(vector< Dcsc<IT,NT>* > & parts, vector<IT> & cuts)
+{
+    IT * jcbegin = jc;
+    vector<IT> pos; // pos has "parts-1" entries
+    for(auto cutpoint = cuts.begin(); cutpoint != cuts.end(); ++cutpoint)
+    {
+        IT * itr = lower_bound(jcbegin, jc+nzc, *cutpoint);
+        pos.push_back(itr - jc);
+        jcbegin = itr;  // so that lower_bound searches a smaller vector
+    }
+    
+    if(cp[pos[0]] == 0) // first piece
+    {
+        parts[0] = NULL;
+    }
+    else
+    {
+        parts[0] = new Dcsc<IT,NT>(cp[pos[0]], pos[0]); // Dcsc(nnz, nzc)
+        copy(jc, jc+pos[0], parts[0]->jc);    // std::copy
+        copy(cp, cp+pos[0]+1, parts[0]->cp);
+        copy(ir, ir+cp[pos[0]], parts[0]->ir);
+        copy(numx, numx + cp[pos[0]], parts[0]->numx);	// copy(first, last, result)
+    }
+    int ncuts =  cuts.size(); // all except last piece
+    for(int i=1; i< ncuts; ++i) // treat the first piece differently
+    {
+        if(cp[pos[i]] - cp[pos[i-1]] == 0)
+        {
+            parts[i] =  NULL;
+        }
+        else
+        {
+            parts[i] = new Dcsc<IT,NT>(cp[pos[i]] - cp[pos[i-1]], pos[i] - pos[i-1]); // Dcsc(nnz, nzc)
+            copy(jc+pos[i-1], jc+pos[i], parts[i]->jc);    // std::copy
+            transform(parts[i]->jc, parts[i]->jc + (pos[i]-pos[i-1]), parts[i]->jc, bind2nd(minus<IT>(), cuts[i-1]));  // cuts[i-1] is well defined as i>=1
+
+            copy(cp+pos[i-1], cp+pos[i]+1, parts[i]->cp);
+            transform(parts[i]->cp, parts[i]->cp + (pos[i]-pos[i-1]+1), parts[i]->cp, bind2nd(minus<IT>(), cp[pos[i-1]]));
+
+            copy(ir+cp[pos[i-1]], ir+cp[pos[i]], parts[i]->ir);
+            copy(numx+cp[pos[i-1]], numx + cp[pos[i]], parts[i]->numx);	// copy(first, last, result)
+        }
+    }
+    if(nz - cp[pos[ncuts-1]] == 0)
+    {
+        parts[ncuts] = NULL;
+    }
+    else
+    {
+        parts[ncuts] = new Dcsc<IT,NT>(nz-cp[pos[ncuts-1]], nzc-pos[ncuts-1]);  // ncuts = npieces -1
+        copy(jc+pos[ncuts-1], jc+ nzc, parts[ncuts]->jc);
+        transform(parts[ncuts]->jc, parts[ncuts]->jc + (nzc-pos[ncuts-1]), parts[ncuts]->jc, bind2nd(minus<IT>(), cuts[ncuts-1]));
+        
+        copy(cp+pos[ncuts-1], cp+nzc+1, parts[ncuts]->cp);
+        transform(parts[ncuts]->cp, parts[ncuts]->cp + (nzc-pos[ncuts-1]+1), parts[ncuts]->cp, bind2nd(minus<IT>(), cp[pos[ncuts-1]]));
+        copy(ir+cp[pos[ncuts-1]], ir+nz, parts[ncuts]->ir);
+        copy(numx+cp[pos[ncuts-1]], numx+nz, parts[ncuts]->numx);
+    }
+}
+
 
 // Assumes A and B are not NULL
 // When any is NULL, this function is not called anyway

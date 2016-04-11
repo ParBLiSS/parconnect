@@ -1,9 +1,30 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.1 -------------------------------------------------*/
-/* date: 12/25/2010 --------------------------------------------*/
+/* version 1.4 -------------------------------------------------*/
+/* date: 1/17/2014 ---------------------------------------------*/
 /* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
 /****************************************************************/
+/*
+ Copyright (c) 2010-2014, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
 
 
 /**
@@ -244,7 +265,7 @@ public:
   		*end_idx = (rankc + 1) * (M / sizec) + (rankc + 1 < (M % sizec) ? rankc + 1 : (M % sizec));
 	}
 
-	static inline void make_graph(int log_numverts, int64_t M, int64_t* nedges_ptr, packed_edge** result_ptr) 
+	static inline void make_graph(int log_numverts, int64_t M, int64_t* nedges_ptr, packed_edge** result_ptr, MPI_Comm & world)
 	{
   		int rank, size;
 #ifdef DETERMINISTIC
@@ -257,8 +278,8 @@ public:
   		uint_fast32_t seed[5];
   		make_mrg_seed(userseed1, userseed1, seed);
 
-  		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  		MPI_Comm_size(MPI_COMM_WORLD, &size);
+  		MPI_Comm_rank(world, &rank);
+  		MPI_Comm_size(world, &size);
 
   		int64_t start_idx, end_idx;
   		compute_edge_range(rank, size, M, &start_idx, &end_idx);

@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.3 -------------------------------------------------*/
-/* date: 2/1/2013 ----------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
- Copyright (c) 2010-, Aydin Buluc
+ Copyright (c) 2010-2015, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -70,9 +70,13 @@ int main(int argc, char* argv[])
 		matrixname = directory+"/"+matrixname;
 	
 		typedef SpParMat <int, double, SpDCCols<int,double> > PARDBMAT;
-		PARDBMAT A;		// declare objects
-		FullyDistVec<int,int> crow, ccol;
-		FullyDistVec<int,double> cval;
+		shared_ptr<CommGrid> fullWorld;
+		fullWorld.reset( new CommGrid(MPI_COMM_WORLD, 0, 0) );
+
+		PARDBMAT A(fullWorld);		// declare objects
+        	FullyDistVec<int,int> crow(fullWorld);
+        	FullyDistVec<int,int> ccol(fullWorld);
+		FullyDistVec<int,double> cval(fullWorld);
 
 		A.ReadDistribute(matrixname, 0);	
 
@@ -104,14 +108,15 @@ int main(int argc, char* argv[])
 		
 		A.PrintInfo();
 		Symmetricize(A);
-		FullyDistVec<int,int> rowsym, colsym;
-		FullyDistVec<int,double> valsym;
+        	FullyDistVec<int,int> rowsym(fullWorld);
+        	FullyDistVec<int,int> colsym(fullWorld);
+		FullyDistVec<int,double> valsym(fullWorld);
 		A.Find(rowsym, colsym, valsym);
 		
-		FullyDistVec<int,double> colsums; 
+		FullyDistVec<int,double> colsums(fullWorld);
 		A.Reduce(colsums, Column, plus<double>(), 0.0);
 		
-		FullyDistVec<int,double> numcols(1, A.getncol());
+		FullyDistVec<int,double> numcols(A.getcommgrid(), 1, A.getncol());
 
 	#if defined(COMBBLAS_TR1) || defined(COMBBLAS_BOOST) || defined(NOTGNU)
 		vector< FullyDistVec<int,double> > vals2concat;
@@ -126,8 +131,8 @@ int main(int argc, char* argv[])
 		nval.PrintInfo("Values:");
 		
 		// sparse() expects a zero based index		
-		FullyDistVec<int,int> firstrowrids(A.getncol()+1, 0);	// M(1,:)
-		FullyDistVec<int,int> firstcolrids(A.getncol(), 0);	// M(2:end,1)
+		FullyDistVec<int,int> firstrowrids(A.getcommgrid(), A.getncol()+1, 0);	// M(1,:)
+		FullyDistVec<int,int> firstcolrids(A.getcommgrid(), A.getncol(), 0);	// M(2:end,1)
 		firstcolrids.iota(A.getncol(),1);	// fill M(2:end,1)'s row ids
 		rowsym.Apply(bind2nd(plus<int>(), 1));
 
@@ -142,9 +147,9 @@ int main(int argc, char* argv[])
 		FullyDistVec<int,int> nrow = Concatenate(rows2concat);
 		nrow.PrintInfo("Row ids:");
 		
-		FullyDistVec<int,int> firstrowcids(A.getncol()+1, 0);	// M(1,:)
+		FullyDistVec<int,int> firstrowcids(A.getcommgrid(), A.getncol()+1, 0);	// M(1,:)
 		firstrowcids.iota(A.getncol()+1,0);	// fill M(1,:)'s column ids
-		FullyDistVec<int,int> firstcolcids(A.getncol(), 0);	// M(2:end,1)
+		FullyDistVec<int,int> firstcolcids(A.getcommgrid(), A.getncol(), 0);	// M(2:end,1)
 		colsym.Apply(bind2nd(plus<int>(), 1));
 
 	#if defined(COMBBLAS_TR1) || defined(COMBBLAS_BOOST) || defined(NOTGNU)

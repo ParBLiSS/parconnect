@@ -1,3 +1,31 @@
+/****************************************************************/
+/* Parallel Combinatorial BLAS Library (for Graph Computations) */
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
+/****************************************************************/
+/*
+ Copyright (c) 2010-2015, The Regents of the University of California
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ THE SOFTWARE.
+ */
+
 #define DETERMINISTIC
 #include "../CombBLAS.h"
 #include <mpi.h>
@@ -8,14 +36,11 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#ifdef THREADED
-	#ifndef _OPENMP
-	#define _OPENMP
-	#endif
-#endif
 
 #ifdef _OPENMP
-	#include <omp.h>
+	int cblas_splits = omp_get_max_threads();
+#else
+	int cblas_splits = 1;
 #endif
 
 double cblas_alltoalltime;
@@ -23,11 +48,6 @@ double cblas_allgathertime;
 double cblas_mergeconttime;
 double cblas_transvectime;
 double cblas_localspmvtime;
-#ifdef _OPENMP
-int cblas_splits = omp_get_max_threads(); 
-#else
-int cblas_splits = 1;
-#endif
 
 #define ITERS 16
 #define EDGEFACTOR 16
@@ -88,15 +108,27 @@ struct prunediscovered: public std::binary_function<int64_t, int64_t, int64_t >
 int main(int argc, char* argv[])
 {
 	int nprocs, myrank;
+#ifdef _OPENMP
+    int provided, flag, claimed;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided );
+    MPI_Is_thread_main( &flag );
+    if (!flag)
+        SpParHelper::Print("This thread called init_thread but Is_thread_main gave false\n");
+    MPI_Query_thread( &claimed );
+    if (claimed != provided)
+        SpParHelper::Print("Query thread gave different thread level than requested\n");
+#else
 	MPI_Init(&argc, &argv);
+#endif
+    
 	MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
 	if(argc < 3)
 	{
 		if(myrank == 0)
 		{
-			cout << "Usage: ./Graph500 <Force,Input> <Scale Forced | Input Name> {FastGen}" << endl;
-			cout << "Example: ./Graph500 Force 25 FastGen" << endl;
+			cout << "Usage: ./tdbfs <Force,Input> <Scale Forced | Input Name> {FastGen}" << endl;
+			cout << "Example: ./tdbfs Force 25 FastGen" << endl;
 		}
 		MPI_Finalize();
 		return -1;
@@ -107,12 +139,14 @@ int main(int argc, char* argv[])
 		typedef SpParMat < int64_t, bool, SpDCCols<int32_t,bool> > PSpMat_s32p64;	// sequentially use 32-bits for local matrices, but parallel semantics are 64-bits
 		typedef SpParMat < int64_t, int, SpDCCols<int32_t,int> > PSpMat_s32p64_Int;	// similarly mixed, but holds integers as upposed to booleans
 		typedef SpParMat < int64_t, int64_t, SpDCCols<int64_t,int64_t> > PSpMat_Int64;
+		shared_ptr<CommGrid> fullWorld;
+		fullWorld.reset( new CommGrid(MPI_COMM_WORLD, 0, 0) );
 
 		// Declare objects
-		PSpMat_Bool A;	
-		PSpMat_s32p64 Aeff;
-		FullyDistVec<int64_t, int64_t> degrees;	// degrees of vertices (including multi-edges and self-loops)
-		FullyDistVec<int64_t, int64_t> nonisov;	// id's of non-isolated (connected) vertices
+		PSpMat_Bool A(fullWorld);
+		PSpMat_s32p64 Aeff(fullWorld);
+		FullyDistVec<int64_t, int64_t> degrees(fullWorld);	// degrees of vertices (including multi-edges and self-loops)
+		FullyDistVec<int64_t, int64_t> nonisov(fullWorld);	// id's of non-isolated (connected) vertices
 		unsigned scale;
 		OptBuf<int32_t, int64_t> optbuf;	// let indices be 32-bits
 		bool scramble = false;
@@ -350,7 +384,7 @@ int main(int argc, char* argv[])
 		degrees.PrintInfo("Degrees array");
 		#endif
 		// degrees.DebugPrint();
-		FullyDistVec<int64_t, int64_t> Cands(ITERS);
+		FullyDistVec<int64_t, int64_t> Cands(ITERS, 0);
 		double nver = (double) degrees.TotalLength();
 
 #ifdef DETERMINISTIC

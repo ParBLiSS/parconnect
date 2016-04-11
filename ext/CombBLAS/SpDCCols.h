@@ -1,11 +1,11 @@
 /****************************************************************/
 /* Parallel Combinatorial BLAS Library (for Graph Computations) */
-/* version 1.2 -------------------------------------------------*/
-/* date: 10/06/2011 --------------------------------------------*/
-/* authors: Aydin Buluc (abuluc@lbl.gov), Adam Lugowski --------*/
+/* version 1.5 -------------------------------------------------*/
+/* date: 10/09/2015 ---------------------------------------------*/
+/* authors: Ariful Azad, Aydin Buluc, Adam Lugowski ------------*/
 /****************************************************************/
 /*
- Copyright (c) 2011, Aydin Buluc
+ Copyright (c) 2010-2015, The Regents of the University of California
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -56,6 +56,8 @@ public:
 	SpDCCols ();
 	SpDCCols (IT size, IT nRow, IT nCol, IT nzc);
 	SpDCCols (const SpTuples<IT,NT> & rhs, bool transpose);
+    SpDCCols (IT nRow, IT nCol, IT nnz1, const tuple<IT, IT, NT> * rhs, bool transpose);
+
 	SpDCCols (const SpDCCols<IT,NT> & rhs);					// Actual copy constructor		
 	~SpDCCols();
 
@@ -193,6 +195,8 @@ public:
 			dcsc->Apply(__unary_op);	
 	}
 	
+	template <typename _UnaryOperation, typename GlobalIT>
+	SpDCCols<IT,NT>* PruneI(_UnaryOperation __unary_op, bool inPlace, GlobalIT rowOffset, GlobalIT colOffset);
 	template <typename _UnaryOperation>
 	SpDCCols<IT,NT>* Prune(_UnaryOperation __unary_op, bool inPlace);
 
@@ -214,12 +218,15 @@ public:
 	{
 		BooleanRowSplit(*this, numsplits);	// only works with boolean arrays
 	}
-
+    
+    void ColSplit(int parts, vector< SpDCCols<IT,NT> > & matrices); //!< \attention Destroys calling object (*this)
 	void Split(SpDCCols<IT,NT> & partA, SpDCCols<IT,NT> & partB); 	//!< \attention Destroys calling object (*this)
 	void Merge(SpDCCols<IT,NT> & partA, SpDCCols<IT,NT> & partB);	//!< \attention Destroys its parameters (partA & partB)
 
 	void CreateImpl(const vector<IT> & essentials);
 	void CreateImpl(IT size, IT nRow, IT nCol, tuple<IT, IT, NT> * mytuples);
+    void CreateImpl(IT * _cp, IT * _jc, IT * _ir, NT * _numx, IT _nz, IT _nzc, IT _m, IT _n);
+
 
 	Arr<IT,NT> GetArrays() const;
 	vector<IT> GetEssentials() const;
@@ -249,15 +256,19 @@ public:
 	template <typename SR>
 	int PlusEq_AnXBn(const SpDCCols<IT,NT> & A, const SpDCCols<IT,NT> & B);
 	
-	Dcsc<IT, NT> * GetDCSC() const 	// only for single threaded matrices
-	{
-		return dcsc;
-	}
-
-	Dcsc<IT, NT> * GetDCSC(int i) const 	// only for split (multithreaded) matrices
-	{
-		return dcscarr[i];
-	}
+    Dcsc<IT, NT> * GetDCSC() const 	// only for single threaded matrices
+    {
+        return dcsc;
+    }
+    
+    Dcsc<IT, NT> * GetDCSC(int i) const 	// only for split (multithreaded) matrices
+    {
+        return dcscarr[i];
+    }
+    
+    auto GetInternal() const    { return GetDCSC(); }
+    auto GetInternal(int i) const  { return GetDCSC(i); }
+	
 
 private:
 	void CopyDcsc(Dcsc<IT,NT> * source);
@@ -282,7 +293,7 @@ private:
 	IT n;
 	IT nnz;
 	
-	int splits;	// ABAB: Future multithreaded extension
+	int splits;	// for multithreading
 
 	template <class IU, class NU>
 	friend class SpDCCols;		// Let other template instantiations (of the same class) access private members
@@ -290,8 +301,10 @@ private:
 	template <class IU, class NU>
 	friend class SpTuples;
 
-	template <class IU, class NU>
-	friend class SpDCCols<IU, NU>::SpColIter;
+	// AL: removed this because it appears illegal and causes this compiler warning:
+	// warning: dependent nested name specifier 'SpDCCols<IU, NU>::' for friend class declaration is not supported; turning off access control for 'SpDCCols'
+	//template <class IU, class NU>
+	//friend class SpDCCols<IU, NU>::SpColIter;
 	
 	template<typename IU>
 	friend void BooleanRowSplit(SpDCCols<IU, bool> & A, int numsplits);
