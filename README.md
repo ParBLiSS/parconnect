@@ -14,7 +14,7 @@ The coloring algorithm implemented by this codebase is described in the followin
 - `cmake` version >= 2.6
 - `g++` (version 4.8.1+)
 - an `MPI` implementation supporting `MPI-2` or `MPI-3`.
-- external (third-party) softwares are included in the [`ext/`](`ext/`) directory of this project.
+- external (third-party) softwares are included in the [`ext/`](ext/) directory of this project.
 
 ### Download and compile
 
