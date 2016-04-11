@@ -151,6 +151,13 @@ namespace conn
             //This gets convenient when we erase the visited elements later
             unVisitedVertices.emplace(i);
           }
+
+          comm.barrier();
+
+          //Print the size of map
+          auto localSize = unVisitedVertices.size();
+          auto totalSize = mxx::reduce(localSize, 0, std::plus<size_t>(), comm); 
+          LOG_IF(comm.rank() == 0, INFO) << "BFS_DEBUG size of map -> " << totalSize;
         }
 
         /**
@@ -175,6 +182,8 @@ namespace conn
 
             //Get the source vertex
             E srcPoint = getSource(offsetForLocalToGlobal);
+
+            LOG_IF(comm.rank() == 0, INFO) << "BFS_DEBUG getSource -> " << srcPoint;
 
             //If all vertices are visited, then exit
             if(srcPoint == MAX)
@@ -232,6 +241,8 @@ namespace conn
             //Number of edges traversed
             //std::size_t nEdgesTraversed = EWiseMult(parentsp, degrees, false, 0).Reduce(plus<E>(), 0);
             E nEdgesTraversed = EWiseMult(parentsp, degrees, false, (E) 0).Reduce(plus<E>(), (E) 0);
+
+            LOG_IF(comm.rank() == 0, INFO) << "BFS_DEBUG nEdgeTraversed -> " << nEdgesTraversed;
 
             //Record the end time of this BFS iteration
             timePoint t2 = clock::now(); 

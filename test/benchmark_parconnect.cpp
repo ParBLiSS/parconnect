@@ -243,10 +243,10 @@ int main(int argc, char** argv)
   std::size_t nEdges = conn::graphGen::globalSizeOfVector(edgeList, comm);
 
   if(bfsIterations > 0) 
-    LOG_IF(!comm.rank(), INFO) << "Graph size : vertices -> " << nVertices << ", edges -> " << nEdges/2;
+    LOG_IF(!comm.rank(), INFO) << "Graph size : vertices -> " << nVertices << ", edges -> " << nEdges/2  << " (x2)";
 
   if(bfsIterations == 0)
-    LOG_IF(!comm.rank(), INFO) << "Graph size : edges -> " << nEdges/2;
+    LOG_IF(!comm.rank(), INFO) << "Graph size : edges -> " << nEdges/2 << " (x2)";
 
   //For saving the size of component discovered using BFS
   std::vector<std::size_t> componentCountsResult;
