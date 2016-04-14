@@ -121,39 +121,14 @@ namespace conn
      * @details                       (u, v) edge in the edgeList is transfromed to (x, y) if u is the xth 
      *                                element in the sorted order of all unique vertices, lly for v is yth 
      *                                Implemented using bucketing and all2all communication
-     *                                Due to all2all, this function call will not have good scalability
      */
     template <typename E>
-      void reduceVertexIds(std::vector<std::pair<E,E>> &edgeList, std::vector<E> &uniqueVertexList, mxx::comm &comm)
+      void reduceVertexIds(std::vector<std::pair<E,E>> &edgeList, std::size_t &uniqueVertexCount, mxx::comm &comm)
       {
         const int SRC = 0, DEST = 1;
 
         //Ensure the block decomposition of edgeList
         mxx::distribute_inplace(edgeList, comm);
-
-        ///Phase 1: lets create a unique and sorted list of vertices
-
-        //Reserve the space in the beginning itself
-        uniqueVertexList.reserve(2*edgeList.size());
-
-        //Populate all the vertices local to this rank
-        for(auto &e : edgeList)
-        {
-          uniqueVertexList.push_back(e.first);
-          uniqueVertexList.push_back(e.second);
-        }
-
-        //Remove duplicates locally
-        auto last = std::unique(uniqueVertexList.begin(), uniqueVertexList.end());
-        uniqueVertexList.erase(last, uniqueVertexList.end());
-
-        //Does the graph have enough unique vertices?
-        assert(uniqueVertexList.size() > 0);
-
-        //Sort the vertices, remove the duplicates and enable equal distribution
-        mxx::sort(uniqueVertexList.begin(), uniqueVertexList.end(), comm);
-        last = mxx::unique(uniqueVertexList.begin(), uniqueVertexList.end(), std::equal_to<E>(), comm);
-        uniqueVertexList.erase(last, uniqueVertexList.end());
 
         //Update the DEST layer of all the edges
         {
@@ -161,91 +136,98 @@ namespace conn
           if(!mxx::is_sorted(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<DEST>(), comm))
             mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<DEST>(), comm);
 
-          auto allSplitters = mxx::allgather(std::get<DEST>(edgeList.front()));
-          allSplitters.erase(allSplitters.begin()); //Discard element that came from rank 0
+          E localVertexIndex = 0;
 
-          //Initialize functor that assigns rank to all the unique vertices 
-          vertexToBucketAssignment<E> vertexRankAssigner(allSplitters);
+          //my last vertex id
+          E lastLocalVertexId = std::get<DEST>(edgeList.back());
 
-          //All2all to perform the bucketing
-          mxx::all2all_func(uniqueVertexList, vertexRankAssigner, comm);
-
-          //Sum count of vertices on previous ranks
-          auto exScanCountOfVertices = mxx::exscan(uniqueVertexList.size(), comm);
-          if(comm.rank() == 0)
-            exScanCountOfVertices = 0;
-
-          //Local sort
-          std::sort(uniqueVertexList.begin(), uniqueVertexList.end());
+          //my first vertex id
+          E firstLocalVertexId = std::get<DEST>(edgeList.front());
 
           //Start traversal over vertex array
-          auto it2 = uniqueVertexList.begin();
           for(auto it = edgeList.begin(); it != edgeList.end();)
           {
             //Edges whose dest element are equal
             auto edgeListRange = conn::utils::findRange(it, edgeList.end(), *it, conn::utils::TpleComp<DEST>()); 
 
-            //Iterator in uniqueVertexList pointing to value equal to dest
-            auto srcMatch = std::find(it2, uniqueVertexList.end(), std::get<DEST>(*it));
-
-            //Id that it should be assigned
-            auto trueId = exScanCountOfVertices + std::distance(uniqueVertexList.begin(), srcMatch);
+            /*
+             * TODO
+             * Preserve these mappings in a separate container if 
+             * we wish to revert the vertex ids back
+             */
 
             std::for_each(edgeListRange.first, edgeListRange.second, [&](std::pair<E,E> &e){
-                std::get<DEST>(e) = trueId;
+                std::get<DEST>(e) = localVertexIndex;
                 });
 
             //Adavance the loop variables
-            it2 = srcMatch;
             it = edgeListRange.second;
+            localVertexIndex++;
           }
-        } //DEST layer updated
 
+          E localUniqueVertexCount = localVertexIndex;
+
+          //Need to compute prefix count of non-shared vertex buckets
+          E exScanUniqueVertices = 0;
+
+          E nextProcsFirstVertexId = mxx::left_shift(firstLocalVertexId, comm);
+          if(comm.rank() != (comm.size() - 1) && lastLocalVertexId == nextProcsFirstVertexId)
+            localUniqueVertexCount--; //Deduct the extra bucket this rank counted
+
+          exScanUniqueVertices = mxx::exscan(localUniqueVertexCount, std::plus<E>(), comm);
+          uniqueVertexCount = mxx::allreduce(localUniqueVertexCount, std::plus<E>(), comm);
+
+          if(!comm.rank()) exScanUniqueVertices = 0;
+
+          //Revise all the vertex ids to global index
+          std::for_each(edgeList.begin(), edgeList.end(), [&](std::pair<E,E> &e){
+              std::get<DEST>(e) += exScanUniqueVertices;
+              });
+        } //DEST layer updated
 
         //Update the SRC layer of all the edges
         {
-          //Globally sort all the edges by SRC layer
           mxx::sort(edgeList.begin(), edgeList.end(), conn::utils::TpleComp<SRC>(), comm);
 
-          auto allSplitters = mxx::allgather(std::get<SRC>(edgeList.front()));
-          allSplitters.erase(allSplitters.begin()); //Discard element that came from rank 0
+          E localVertexIndex = 0;
 
-          //Initialize functor that assigns rank to all the unique vertices 
-          vertexToBucketAssignment<E> vertexRankAssigner(allSplitters);
+          //my last vertex id
+          E lastLocalVertexId = std::get<SRC>(edgeList.back());
 
-          //All2all to perform the bucketing
-          mxx::all2all_func(uniqueVertexList, vertexRankAssigner, comm);
-
-          //Sum count of vertices on previous ranks
-          auto exScanCountOfVertices = mxx::exscan(uniqueVertexList.size(), comm);
-          if(comm.rank() == 0)
-            exScanCountOfVertices = 0;
-
-          //Local sort
-          std::sort(uniqueVertexList.begin(), uniqueVertexList.end());
+          //my first vertex id
+          E firstLocalVertexId = std::get<SRC>(edgeList.front());
 
           //Start traversal over vertex array
-          auto it2 = uniqueVertexList.begin();
           for(auto it = edgeList.begin(); it != edgeList.end();)
           {
-            //Edges whose src element are equal
+            //Edges whose dest element are equal
             auto edgeListRange = conn::utils::findRange(it, edgeList.end(), *it, conn::utils::TpleComp<SRC>()); 
 
-            //Iterator in uniqueVertexList pointing to value equal to src
-            auto srcMatch = std::find(it2, uniqueVertexList.end(), std::get<SRC>(*it));
-
-            //Id that it should be assigned
-            auto trueId = exScanCountOfVertices + std::distance(uniqueVertexList.begin(), srcMatch);
-
             std::for_each(edgeListRange.first, edgeListRange.second, [&](std::pair<E,E> &e){
-                std::get<SRC>(e) = trueId;
+                std::get<SRC>(e) = localVertexIndex;
                 });
 
             //Adavance the loop variables
-            it2 = srcMatch;
             it = edgeListRange.second;
+            localVertexIndex++;
           }
-        } //SRC layer updated
+
+          E localUniqueVertexCount = localVertexIndex;
+
+          E exScanUniqueVertices = 0;
+
+          E nextProcsFirstVertexId = mxx::left_shift(firstLocalVertexId, comm);
+          if(comm.rank() != (comm.size() - 1) && lastLocalVertexId == nextProcsFirstVertexId)
+            localUniqueVertexCount--; //Deduct the extra bucket this rank counted
+
+          exScanUniqueVertices = mxx::exscan(localUniqueVertexCount, std::plus<E>(), comm);
+          if(!comm.rank()) exScanUniqueVertices = 0;
+
+          //Revise all the vertex ids to global index
+          std::for_each(edgeList.begin(), edgeList.end(), [&](std::pair<E,E> &e){
+              std::get<SRC>(e) += exScanUniqueVertices;
+              });
+        }//SRC layer updated
       }
   }
 }
