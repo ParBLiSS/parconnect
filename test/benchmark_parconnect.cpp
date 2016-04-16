@@ -283,6 +283,9 @@ int main(int argc, char** argv)
         cclInstance.compute();
 
         countComponents += cclInstance.computeComponentCount();
+
+        auto largestCompSize = cclInstance.computeLargestComponentSize();
+        LOG_IF(!comm.rank(), INFO)  << "Largest componont size (edges) -> " << largestCompSize << " (x2)";
     });
   }
   else

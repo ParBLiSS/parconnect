@@ -138,6 +138,92 @@ namespace conn
           return componentCount;
         }
 
+        /**
+         * @brief     compute the largest count of component in terms of edges (useful for graph statistics)
+         * @note      should be called after computing connected components. 
+         * @note      Largest is computed ONLY among the components computed through coloring
+         */
+        std::size_t computeLargestComponentSize()
+        {
+          using E = pIdtype;
+
+          std::size_t largestComponentSize = 0;
+
+          comm.with_subset(tupleVector.begin() !=  tupleVector.end() , [&](const mxx::comm& comm){
+
+              //Vector should be sorted by Pc
+            if(!mxx::is_sorted(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm))
+              mxx::sort(tupleVector.begin(), tupleVector.end(), conn::utils::TpleComp<cclTupleIds::Pc>(), comm);
+
+              std::vector<std::pair<E,E>> partitionSizeVector;
+
+              std::pair<E,E> firstPc(0,0);      //Component that touches the left boundary
+              std::pair<E,E> middlePc (0,0);    //Internal partition in this rank (not at the boundaries)
+              std::pair<E,E> lastPc(0,0);
+
+              for(auto it = tupleVector.begin(); it != tupleVector.end();)
+              {
+                auto equalPcRange = conn::utils::findRange(it, tupleVector.end(), *it, conn::utils::TpleComp<cclTupleIds::Pc>()); 
+
+                auto pcSize = std::distance(equalPcRange.first, equalPcRange.second);
+
+                if(equalPcRange.first == tupleVector.begin())   //First bucket
+                {
+                  firstPc.first = std::get<cclTupleIds::Pc>(*it);
+                  first.second = pcSize;
+                }
+                else if(equalPcRange.first != tupleVector.begin() && equalPcRange.second == tupleVector.end())   //Last bucket (and different from first bucket)
+                {
+                  secondPc.first = std::get<cclTupleIds::Pc>(*it);
+                  secondPc.second = pcSize;
+                }
+                else
+                {
+                  if(pcSize > middlePc.second)
+                  {
+                    middlePc.first = std::get<cclTupleIds::Pc>(*it);
+                    middlePc.second = pcSize;
+                  }
+                }
+
+                it = equalPcRange.second;
+              }
+              
+              if(firstPc.second > 0) partitionSizeVector.push_back(firstPc);
+              if(middlePc.second > 0) partitionSizeVector.push_back(middlePc);
+              if(lastPc.second > 0) partitionSizeVector.push_back(lastPc);
+
+              //Gather all sizes to rank 0
+              auto globalPartitionSizeVector = mxx::gatherv(partitionSizeVector, 0, comm);
+
+              if(comm.rank() == 0)
+              {
+                const int PcLayer = 0, sizeLayer = 1;
+
+                for(auto it = globalPartitionSizeVector.begin(); it != globalPartitionSizeVector.end();)
+                {
+                  //Pairs corresponding to same Pc
+                  auto equalPcRange = conn::utils::findRange(it, globalPartitionSizeVector.end(), *it, conn::utils::TpleComp<PcLayer>());
+
+                  auto thisSize = std::accumulate(equalPcRange.first, equalPcRange.second, static_cast<E>(0), [&](const E &p1, const std::pair<E,E> &p2){
+                      return p1 + std::get<sizeLayer>(p2);
+                      });
+
+                  if(thisSize > largestComponentSize)
+                    largestComponentSize = thisSize;
+
+
+                  it = equalPcRange.second;
+                }
+              }
+          });
+
+          largestComponentSize = mxx::allreduce(largestComponentSize, mxx::max<std::size_t>(), comm);
+
+          return largestComponentSize;
+        }
+
+
       private:
 
         /**
@@ -156,23 +242,23 @@ namespace conn
          *            We ignore the bucket splits across ranks here, because that shouldn't affect the correctness and complexity
          */
         template <typename edgeListPairsType>
-        void convertEdgeListforCCL(edgeListPairsType &edgeList)
-        {
-          Timer timer(std::cerr, comm);
+          void convertEdgeListforCCL(edgeListPairsType &edgeList)
+          {
+            Timer timer(std::cerr, comm);
 
-          //Reserve the approximate required space in our vector
-          tupleVector.reserve(edgeList.size());
+            //Reserve the approximate required space in our vector
+            tupleVector.reserve(edgeList.size());
 
-          for(auto it = edgeList.begin(); it != edgeList.end(); it++)
-            tupleVector.emplace_back(std::get<edgeListTIds::src>(*it), MAX_PID, std::get<edgeListTIds::dst>(*it));;
+            for(auto it = edgeList.begin(); it != edgeList.end(); it++)
+              tupleVector.emplace_back(std::get<edgeListTIds::src>(*it), MAX_PID, std::get<edgeListTIds::dst>(*it));;
 
-          timer.end_section("vector of tuples initialized for ccl");
+            timer.end_section("vector of tuples initialized for ccl");
 
-          //Log the total count of tuples 
-          auto totalTupleCount = mxx::reduce(tupleVector.size(), 0, comm);
+            //Log the total count of tuples 
+            auto totalTupleCount = mxx::reduce(tupleVector.size(), 0, comm);
 
-          LOG_IF(comm.rank() == 0, INFO) << "Total tuple count is " << totalTupleCount;
-        }
+            LOG_IF(comm.rank() == 0, INFO) << "Total tuple count is " << totalTupleCount;
+          }
 
         /**
          * @brief     run the iterative algorithm for ccl
