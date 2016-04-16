@@ -170,12 +170,12 @@ namespace conn
                 if(equalPcRange.first == tupleVector.begin())   //First bucket
                 {
                   firstPc.first = std::get<cclTupleIds::Pc>(*it);
-                  first.second = pcSize;
+                  firstPc.second = pcSize;
                 }
                 else if(equalPcRange.first != tupleVector.begin() && equalPcRange.second == tupleVector.end())   //Last bucket (and different from first bucket)
                 {
-                  secondPc.first = std::get<cclTupleIds::Pc>(*it);
-                  secondPc.second = pcSize;
+                  lastPc.first = std::get<cclTupleIds::Pc>(*it);
+                  lastPc.second = pcSize;
                 }
                 else
                 {
@@ -220,7 +220,7 @@ namespace conn
 
           largestComponentSize = mxx::allreduce(largestComponentSize, mxx::max<std::size_t>(), comm);
 
-          return largestComponentSize;
+          return largestComponentSize/2;
         }
 
 
