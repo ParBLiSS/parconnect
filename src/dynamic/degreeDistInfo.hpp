@@ -39,6 +39,7 @@
 #include "mxx/reduction.hpp"
 #include "mxx/sort.hpp"
 #include "plfit/src/plfit.h"
+#include "mxx/timer.hpp"
 
 namespace conn 
 {
@@ -79,6 +80,10 @@ namespace conn
     template <typename E>
       bool runBFSDecision(std::vector<std::pair<E,E>> &edgeList, mxx::comm &comm)
       {
+#ifdef BENCHMARK_CONN
+        mxx::section_timer timer(std::cerr, comm);
+#endif
+
         const int SRC = 1, DEST = 0;  //Reverse the layers to avoid sorting during relabeling vertices
 
         const int sampler = 11;
@@ -161,6 +166,10 @@ namespace conn
 
         int decision = 0;   //false
 
+#ifdef BENCHMARK_CONN
+        timer.end_section("Degree distribution completed");
+#endif
+
         if(!comm.rank())
         {
           auto statisticVal = fitCurve(globalDegreeCounts);
@@ -175,6 +184,10 @@ namespace conn
           }
 
         }
+
+#ifdef BENCHMARK_CONN
+        timer.end_section("K-S test completed");
+#endif
 
         auto gbDecision = mxx::allreduce(decision, mxx::max<int>(), comm);
 
