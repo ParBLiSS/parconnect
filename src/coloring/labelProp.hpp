@@ -538,14 +538,21 @@ namespace conn
          * @param[in] beginOffset               tupleVector.begin() + beginOffset would denote the begin iterator for active tuples
          * @param[in] parentRequestTupleVector  All the 'parentRequest' tuples
          */
-        void doPointerDoubling(std::size_t beginOffset, std::vector<T>& parentRequestTupleVector)
+        void doPointerDoubling(std::size_t &beginOffset, std::vector<T>& parentRequestTupleVector)
         {
           //Copy the tuples from parentRequestTupleVector to tupleVector 
           tupleVector.insert(tupleVector.end(), parentRequestTupleVector.begin(), parentRequestTupleVector.end());
 
+          mxx::distribute_inplace(tupleVector, comm);
+
           //Range of active tuples in tupleVector needs to be updated 
           auto begin = tupleVector.begin() + beginOffset;
           auto end = tupleVector.end();
+
+          //Need to block decompose right hand portion
+          begin = mxx::block_decompose_partitions_right(tupleVector.begin(), begin, end, comm);
+          end = tupleVector.end();  //Redefine, above function is not inplace
+          beginOffset = std::distance(tupleVector.begin(), begin);
 
           //Work among ranks with non-zero count of tuples
           comm.with_subset(begin != end, [&](const mxx::comm& com){
