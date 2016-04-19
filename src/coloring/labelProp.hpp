@@ -336,7 +336,7 @@ namespace conn
 
               if(OPTIMIZATION == opt_level::loadbalanced)
               {
-                mid = mxx::block_decompose_partitions(begin, mid, end, comm);
+                mid = mxx::block_decompose_partitions_right(begin, mid, end, comm);
                 //Re distributed the tuples to balance the load across the ranks
               
                 timer.end_section("Load balanced");
