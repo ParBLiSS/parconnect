@@ -123,7 +123,7 @@ namespace conn
      *                                Implemented using bucketing and all2all communication
      */
     template <typename E>
-      void reduceVertexIds(std::vector<std::pair<E,E>> &edgeList, std::size_t &uniqueVertexCount, mxx::comm &comm)
+      void reduceVertexIds(std::vector<std::pair<E,E>> &edgeList, std::size_t &uniqueVertexCount, const mxx::comm &comm)
       {
         const int SRC = 0, DEST = 1;
 

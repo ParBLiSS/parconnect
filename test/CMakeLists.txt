@@ -16,6 +16,9 @@ target_link_libraries(benchmark_parconnect ${EXTRA_LIBS} MPITypelib CommGridlib)
 add_executable(benchmark_parconnect_auto benchmark_parconnect_auto.cpp)
 target_link_libraries(benchmark_parconnect_auto ${EXTRA_LIBS} MPITypelib CommGridlib plfit0)
 
+add_executable(benchmark_sequential benchmark_sequential.cpp)
+target_link_libraries(benchmark_sequential ${EXTRA_LIBS})
+
 add_executable(time_all2all time_all2all.cpp)
 target_link_libraries(time_all2all ${EXTRA_LIBS})
 
