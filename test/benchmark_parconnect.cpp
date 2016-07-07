@@ -62,12 +62,12 @@ int main(int argc, char** argv)
    * COMMAND LINE ARGUMENTS
    */
 
-  LOG_IF(!comm.rank(), INFO) << "Starting executable for benchmarking in the Student Cluster Competition";
+  LOG_IF(!comm.rank(), INFO) << "Starting executable for computing connectivity of the input graph";
 
   //Parse command line arguments
   ArgvParser cmd;
 
-  cmd.setIntroductoryDescription("Benchmark for computing connectivity in the Student Cluster Competition");
+  cmd.setIntroductoryDescription("Benchmark for computing connectivity of large undirected graphs");
   cmd.setHelpOption("h", "help", "Print this help page");
 
   cmd.defineOption("input", "dbg or kronecker or generic or chain", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
