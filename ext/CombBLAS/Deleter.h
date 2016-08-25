@@ -42,47 +42,17 @@ struct DeletePtrIf
         }
 };
 
-
-template<typename A>
-void DeleteAll(A arr1)
+template<typename T>
+void DeleteAll(T arr)
 {
-        delete [] arr1;
+    delete [] arr;
 }
 
-template<typename A, typename B>
-void DeleteAll(A arr1, B arr2)
+template<typename T, typename ...Args>
+void DeleteAll(T arr, Args... restArr)
 {
-        delete [] arr2;
-        DeleteAll(arr1);
-}
-
-template<typename A, typename B, typename C>
-void DeleteAll(A arr1, B arr2, C arr3)
-{
-        delete [] arr3;
-        DeleteAll(arr1, arr2);
-}
-
-template<typename A, typename B, typename C, typename D>
-void DeleteAll(A arr1, B arr2, C arr3, D arr4)
-{
-        delete [] arr4;
-        DeleteAll(arr1, arr2, arr3);
-}
-
-
-template<typename A, typename B, typename C, typename D, typename E>
-void DeleteAll(A arr1, B arr2, C arr3, D arr4, E arr5)
-{
-        delete [] arr5;
-        DeleteAll(arr1, arr2, arr3, arr4);
-}
-
-template<typename A, typename B, typename C, typename D, typename E, typename F>
-void DeleteAll(A arr1, B arr2, C arr3, D arr4, E arr5, F arr6)
-{
-        delete [] arr6;
-        DeleteAll(arr1, arr2, arr3, arr4,arr5);
+    delete [] arr;
+    DeleteAll(restArr...);
 }
 
 #endif
