@@ -17,6 +17,7 @@ The coloring algorithm implemented by this codebase is described in the followin
 - `g++` (version 4.9+)
 - an `MPI` implementation supporting `MPI-2` or `MPI-3`.
 - external (third-party) softwares are included in the [`ext/`](ext/) directory of this project.
+- .cpp files are in the [`test/`](test/) directory of this project. [`src/`](src/) folder contains the implmentation of the complete algorithm as header files.
 
 ### Download and compile
 
