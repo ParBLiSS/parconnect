@@ -73,7 +73,6 @@ int main(int argc, char** argv)
   cmd.defineOption("input", "dbg or kronecker or generic", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
   cmd.defineOption("file", "input file (if input = dbg or generic)", ArgvParser::OptionRequiresValue);
   cmd.defineOption("scale", "scale of the graph (if input = kronecker)", ArgvParser::OptionRequiresValue);
-  cmd.defineOption("pointerDouble", "set to y/n to control pointer doubling during coloring", ArgvParser::OptionRequiresValue | ArgvParser::OptionRequired);
 
   int result = cmd.parse(argc, argv);
 
@@ -95,14 +94,6 @@ int main(int argc, char** argv)
   std::size_t nVertices;
 
   LOG_IF(!comm.rank(), INFO) << "Generating graph";
-
-  //Fetch the pointer doubling choice
-  bool pointerDouble;
-  if(cmd.optionValue("pointerDouble") == "y")
-    pointerDouble = true;
-  else
-    pointerDouble = false;
-
 
 #ifdef BENCHMARK_CONN
   mxx::section_timer timer(std::cerr, comm);
@@ -207,6 +198,7 @@ int main(int argc, char** argv)
 #endif
 
   //Call the graph reducer function
+  //Index the vertex ids from 0 to |V|-1
   if(runBFS) 
   {
     conn::graphGen::reduceVertexIds(edgeList, nVertices, comm);
@@ -257,24 +249,16 @@ int main(int argc, char** argv)
 
   LOG_IF(!comm.rank(), INFO) << noBFSIterationsExecuted << " BFS iterations executed";
 
-  if(pointerDouble)
-  {
-    comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
-        conn::coloring::ccl<vertexIdType, conn::coloring::lever::ON> cclInstance(edgeList, comm);
-        cclInstance.compute();
+  comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
+      conn::coloring::ccl<vertexIdType, conn::coloring::lever::ON> cclInstance(edgeList, comm);
 
-        countComponents += cclInstance.computeComponentCount();
-    });
-  }
-  else
-  {
-     comm.with_subset(edgeList.size() > 0, [&](const mxx::comm& comm){
-        conn::coloring::ccl<vertexIdType, conn::coloring::lever::OFF> cclInstance(edgeList, comm);
-        cclInstance.compute();
+      //We no longer need to store the edgeList
+      edgeList.clear();
 
-        countComponents += cclInstance.computeComponentCount();
-    });
-  }
+      cclInstance.compute();
+
+      countComponents += cclInstance.computeComponentCount();
+      });
 
 #ifdef BENCHMARK_CONN
     timer.end_section("Coloring completed");

@@ -10,20 +10,20 @@ add_definitions( -DPROJECT_TEST_DATA_DIR=${PROJECT_SOURCE_DIR}/data)
 ## PERFORMANCE ##
 #################
 
-add_executable(benchmark_parconnect benchmark_parconnect.cpp)
-target_link_libraries(benchmark_parconnect ${EXTRA_LIBS} MPITypelib CommGridlib)
+#add_executable(benchmark_parconnect benchmark_parconnect.cpp)
+#target_link_libraries(benchmark_parconnect ${EXTRA_LIBS} MPITypelib CommGridlib)
 
-add_executable(benchmark_parconnect_auto benchmark_parconnect_auto.cpp)
-target_link_libraries(benchmark_parconnect_auto ${EXTRA_LIBS} MPITypelib CommGridlib plfit0)
+add_executable(parconnect benchmark_parconnect_auto.cpp)
+target_link_libraries(parconnect ${EXTRA_LIBS} MPITypelib CommGridlib plfit0)
 
-add_executable(benchmark_sequential benchmark_sequential.cpp)
-target_link_libraries(benchmark_sequential ${EXTRA_LIBS})
+#add_executable(benchmark_sequential benchmark_sequential.cpp)
+#target_link_libraries(benchmark_sequential ${EXTRA_LIBS})
 
-add_executable(time_all2all time_all2all.cpp)
-target_link_libraries(time_all2all ${EXTRA_LIBS})
+#add_executable(time_all2all time_all2all.cpp)
+#target_link_libraries(time_all2all ${EXTRA_LIBS})
 
-add_executable(time_sort time_sort.cpp)
-target_link_libraries(time_sort ${EXTRA_LIBS})
+#add_executable(time_sort time_sort.cpp)
+#target_link_libraries(time_sort ${EXTRA_LIBS})
 
 #################
 ## CORRECTNESS ##

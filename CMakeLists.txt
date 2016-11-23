@@ -10,7 +10,7 @@ project(parConnect)
 
 ####Configurale option for turning on Benchmarking
 
-OPTION(BENCHMARK_ENABLE_CONN "Turn on/off the benchmarking" ON)
+OPTION(BENCHMARK_ENABLE_CONN "Turn on/off the benchmarking" OFF)
 if(BENCHMARK_ENABLE_CONN)
   add_definitions(-DBENCHMARK_CONN)
 endif(BENCHMARK_ENABLE_CONN)
