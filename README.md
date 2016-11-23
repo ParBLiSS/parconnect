@@ -9,15 +9,16 @@ The connectivity algorithm implemented by this codebase is described in the foll
 
 All the results in this publication were successfully reproduced at the cluster competition in SC16.
 
-## Code organization
-
 ### Dependencies
 
 - `cmake` version >= 2.6
 - `g++` (version 4.9+)
 - an `MPI` implementation supporting `MPI-2` or `MPI-3`.
+
+### Code organization
+
 - external (third-party) softwares are included in the [`ext/`](ext/) directory of this project.
-- .cpp files are in the [`test/`](test/) directory of this project. [`src/`](src/) folder contains the implmentation of the complete algorithm as header files.
+- .cpp files are in the [`test/`](test/) directory of this project. [`src/`](src/) folder contains the implementation of the complete algorithm as header files.
 
 ### Download and compile
 
