@@ -44,4 +44,4 @@ Inside the build directory,
 ```sh
 mpirun -np <COUNT OF PROCESSES> ./bin/<EXECUTABLE> <ARGUMENTS>
 ```
-Example use-cases and test files are documented [here](http://alurulab.cc.gatech.edu/connected-components).
+Explanation of different use-cases and different test files are available to download  [here](http://alurulab.cc.gatech.edu/connected-components).
