@@ -214,8 +214,16 @@ int main(int argc, char** argv)
   conn::graphGen::permuteVectorIds(edgeList);
   LOG_IF(!comm.rank(), INFO) << "Vertex ids permuted";
 
+#ifdef BENCHMARK_CONN
+  timer.end_section("Graph ids permuted");
+#endif
+
   conn::graphGen::reduceVertexIds(edgeList, nVertices, comm);
   LOG_IF(!comm.rank(), INFO) << "Ids compacted for REM algorithm";
+
+#ifdef BENCHMARK_CONN
+  timer.end_section("Vertex ids relabeled");
+#endif
 
   LOG_IF(!comm.rank(), INFO) << "Graph size : vertices -> " << nVertices << ", edges -> " << nEdges/2  << " (x2)";
 
