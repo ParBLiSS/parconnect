@@ -4,8 +4,9 @@ cmake_minimum_required(VERSION 2.6)
 project(parConnect)
 
 #### If compiling on NERSC Cray cluster, specify the compilers
-#SET(CMAKE_CXX_COMPILER /opt/cray/craype/2.5.1/bin/CC)
-#SET(CMAKE_C_COMPILER /opt/cray/craype/2.5.1/bin/cc)
+#### Also, check the compiler version used here is latest
+#SET(CMAKE_CXX_COMPILER /opt/cray/craype/2.5.5/bin/CC)
+#SET(CMAKE_C_COMPILER /opt/cray/craype/2.5.5/bin/cc)
 #SET(BUILD_SHARED_LIBS "OFF")
 
 ####Configurale option for turning on Benchmarking
